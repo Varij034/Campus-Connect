@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { PAGES, USER_TYPES } from './data/constants';
 import CompanyDashboard from './pages/CompanyDashboard';
 import EditProfilePage from './pages/EditProfilePage';
+import JobDetailsPage from './pages/JobDetailsPage';
 import LandingPage from './pages/LandingPage';
 import PracticePage from './pages/PracticePage';
 import StudentDashboard from './pages/StudentDashboard';
@@ -15,6 +16,8 @@ function App() {
   const [currentStreak, setCurrentStreak] = useState(7);
   const [longestStreak, setLongestStreak] = useState(15);
   const [solvedToday, setSolvedToday] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [appliedJobs, setAppliedJobs] = useState([]);
   
   // Student profile data (in real app, this would come from backend/API)
   const [profileData, setProfileData] = useState({
@@ -26,13 +29,24 @@ function App() {
     email: 'john.doe@example.com',
     phone: '9876543210',
     skills: 'React.js, Node.js, Python',
-    resume: null, // Will store { name: 'resume.pdf', url: 'blob:...', uploadDate: '...' }
+    resume: null,
     isVerified: true
   });
 
   const handleNavigation = (page, type = null) => {
     setCurrentPage(page);
     if (type) setUserType(type);
+  };
+
+  const handleJobClick = (job) => {
+    setSelectedJob(job);
+    setCurrentPage(PAGES.JOB_DETAILS);
+  };
+
+  const handleApplyJob = (jobId) => {
+    setAppliedJobs([...appliedJobs, jobId]);
+    // In real app, make API call here to submit application
+    console.log('Job application submitted for job ID:', jobId);
   };
 
   const handlePracticeComplete = (passed) => {
@@ -47,26 +61,32 @@ function App() {
   };
 
   const handleSaveProfile = (updatedData) => {
-    // Update profile data in state
     setProfileData(prev => ({
       ...prev,
       ...updatedData
     }));
-    
-    // In real app, this is where you would make API call to backend:
-    // await api.updateProfile(profileData.sid, updatedData);
     console.log('Profile data ready for backend:', updatedData);
+  };
+
+  // Scroll to top whenever page changes
+  const handleNavigationWithScroll = (page, type = null) => {
+    handleNavigation(page, type);
+    window.scrollTo(0, 0); // Scroll to top
+  };
+
+  const handleJobClickWithScroll = (job) => {
+    handleJobClick(job);
+    window.scrollTo(0, 0); // Scroll to top
   };
 
   return (
     <div>
-      {/* Toast Container - Add this at the top level */}
+      {/* Toast Container */}
       <Toaster
         position="top-right"
         reverseOrder={false}
         gutter={8}
         toastOptions={{
-          // Default options
           duration: 4000,
           style: {
             background: '#363636',
@@ -75,7 +95,6 @@ function App() {
             borderRadius: '10px',
             padding: '16px',
           },
-          // Success toast style
           success: {
             duration: 3000,
             iconTheme: {
@@ -83,7 +102,6 @@ function App() {
               secondary: '#fff',
             },
           },
-          // Error toast style
           error: {
             duration: 4000,
             iconTheme: {
@@ -95,7 +113,7 @@ function App() {
       />
 
       {currentPage === PAGES.LANDING && (
-        <LandingPage onNavigate={handleNavigation} />
+        <LandingPage onNavigate={handleNavigationWithScroll} />
       )}
       
       {currentPage === PAGES.DASHBOARD && userType === USER_TYPES.STUDENT && (
@@ -104,23 +122,24 @@ function App() {
           longestStreak={longestStreak}
           solvedToday={solvedToday}
           profileData={profileData}
-          onNavigate={handleNavigation}
+          onNavigate={handleNavigationWithScroll}
+          onJobClick={handleJobClickWithScroll}
         />
       )}
       
       {currentPage === PAGES.DASHBOARD && userType === USER_TYPES.TPO && (
-        <TPODashboard onNavigate={handleNavigation} />
+        <TPODashboard onNavigate={handleNavigationWithScroll} />
       )}
       
       {currentPage === PAGES.DASHBOARD && userType === USER_TYPES.COMPANY && (
-        <CompanyDashboard onNavigate={handleNavigation} />
+        <CompanyDashboard onNavigate={handleNavigationWithScroll} />
       )}
       
       {currentPage === PAGES.PRACTICE && (
         <PracticePage
           currentStreak={currentStreak}
           longestStreak={longestStreak}
-          onNavigate={handleNavigation}
+          onNavigate={handleNavigationWithScroll}
           onComplete={handlePracticeComplete}
         />
       )}
@@ -129,7 +148,15 @@ function App() {
         <EditProfilePage
           profileData={profileData}
           onSave={handleSaveProfile}
-          onNavigate={handleNavigation}
+          onNavigate={handleNavigationWithScroll}
+        />
+      )}
+
+      {currentPage === PAGES.JOB_DETAILS && (
+        <JobDetailsPage
+          job={selectedJob}
+          onNavigate={handleNavigationWithScroll}
+          onApply={handleApplyJob}
         />
       )}
     </div>
