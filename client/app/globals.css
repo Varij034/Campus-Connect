@@ -1,0 +1,229 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: light --default, dark night;
+}
+
+@plugin "daisyui/theme" {
+  name: "night";
+  default: false;
+  prefersdark: false;
+  color-scheme: "dark";
+  --color-base-100: oklch(20.768% 0.039 265.754);
+  --color-base-200: oklch(19.314% 0.037 265.754);
+  --color-base-300: oklch(17.86% 0.034 265.754);
+  --color-base-content: oklch(84.153% 0.007 265.754);
+  --color-primary: #4f328f;
+  --color-primary-content: oklch(96% 0.007 247.896);
+  --color-secondary: oklch(68.011% 0.158 276.934);
+  --color-secondary-content: oklch(13.602% 0.031 276.934);
+  --color-accent: #667ce8;
+  --color-accent-content: oklch(96% 0.007 247.896);
+  --color-neutral: oklch(27.949% 0.036 260.03);
+  --color-neutral-content: oklch(85.589% 0.007 260.03);
+  --color-info: #4f328f;
+  --color-info-content: oklch(96% 0.007 247.896);
+  --color-success: oklch(78.452% 0.132 181.911);
+  --color-success-content: oklch(15.69% 0.026 181.911);
+  --color-warning: oklch(83.242% 0.139 82.95);
+  --color-warning-content: oklch(16.648% 0.027 82.95);
+  --color-error: oklch(71.785% 0.17 13.118);
+  --color-error-content: oklch(14.357% 0.034 13.118);
+  --radius-selector: 1.5rem;
+  --radius-field: 1rem;
+  --radius-box: 1.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "light";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(98% 0.001 106.423);
+  --color-base-200: oklch(97% 0.001 106.424);
+  --color-base-300: oklch(92% 0.003 48.717);
+  --color-base-content: oklch(21% 0.006 56.043);
+  --color-primary: oklch(60% 0.25 292.717);
+  --color-primary-content: oklch(97% 0.001 106.424);
+  --color-secondary: oklch(79% 0.209 151.711);
+  --color-secondary-content: oklch(26% 0.065 152.934);
+  --color-accent: #8b5cf6;
+  --color-accent-content: oklch(97% 0.001 106.424);
+  --color-neutral: oklch(60% 0.25 292.717);
+  --color-neutral-content: oklch(98% 0.001 106.423);
+  --color-info: oklch(70% 0.165 254.624);
+  --color-info-content: oklch(28% 0.091 267.935);
+  --color-success: oklch(77% 0.152 181.912);
+  --color-success-content: oklch(27% 0.046 192.524);
+  --color-warning: oklch(82% 0.189 84.429);
+  --color-warning-content: oklch(27% 0.077 45.635);
+  --color-error: oklch(70% 0.191 22.216);
+  --color-error-content: oklch(25% 0.092 26.042);
+  --radius-selector: 1.5rem;
+  --radius-field: 1rem;
+  --radius-box: 1.5rem;
+  --size-selector: 0.28125rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 1;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+  transition: background-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Smooth transitions for all theme-dependent properties */
+* {
+  transition: background-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              fill 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              stroke 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Exclude certain elements from transitions for performance */
+button, a, input, textarea, select {
+  transition: background-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Theme ripple effect */
+.theme-ripple {
+  position: fixed;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(79, 50, 143, 0.35) 0%,
+    rgba(139, 92, 246, 0.25) 40%,
+    transparent 65%
+  );
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+  will-change: width, height, opacity;
+}
+
+.theme-ripple.active {
+  animation: ripple-expand 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes ripple-expand {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  40% {
+    opacity: 0.9;
+  }
+  100% {
+    width: var(--ripple-size, 2000px);
+    height: var(--ripple-size, 2000px);
+    opacity: 0;
+  }
+}
+
+/* Dark mode specific ripple */
+[data-theme="night"] .theme-ripple {
+  background: radial-gradient(
+    circle,
+    rgba(139, 92, 246, 0.4) 0%,
+    rgba(79, 50, 143, 0.3) 40%,
+    transparent 65%
+  );
+}
+
+/* Enhanced rounded corners for components */
+@layer utilities {
+  .rounded-card {
+    border-radius: 1.5rem;
+  }
+  
+  .rounded-button {
+    border-radius: 1rem;
+  }
+  
+  .rounded-input {
+    border-radius: 1rem;
+  }
+}
+
+/* Apply rounded-full to all buttons and inputs */
+@layer components {
+  .btn {
+    border-radius: 9999px !important;
+  }
+  
+  .input,
+  .input-bordered,
+  .select,
+  .select-bordered,
+  .textarea,
+  .textarea-bordered {
+    border-radius: 9999px !important;
+  }
+  
+  /* Modern card styling with borders and clean shadows (shadcn/ui style) */
+  .card {
+    border-radius: 1.5rem !important;
+    border: 1px solid var(--color-base-300) !important;
+    box-shadow: 
+      0 1px 2px 0 rgb(0 0 0 / 0.05),
+      0 1px 3px 0 rgb(0 0 0 / 0.1),
+      0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+    transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out !important;
+  }
+  
+  .card:hover {
+    border-color: var(--color-base-300) !important;
+    box-shadow: 
+      0 4px 6px -1px rgb(0 0 0 / 0.1),
+      0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+  }
+}
+
+/* Light mode card border - subtle border */
+[data-theme="light"] .card {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .card:hover {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Dark mode card styling */
+[data-theme="night"] .card {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 
+    0 1px 2px 0 rgb(0 0 0 / 0.3),
+    0 1px 3px 0 rgb(0 0 0 / 0.4),
+    0 1px 2px -1px rgb(0 0 0 / 0.4) !important;
+}
+
+[data-theme="night"] .card:hover {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 
+    0 4px 6px -1px rgb(0 0 0 / 0.4),
+    0 2px 4px -2px rgb(0 0 0 / 0.4) !important;
+}
