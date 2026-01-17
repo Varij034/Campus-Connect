@@ -2,18 +2,20 @@
 import { Search, TrendingUp } from 'lucide-react';
 import DashboardHeader from '../components/common/DashboardHeader';
 import StatCard from '../components/common/StatCard';
-import DailyPracticeSection from '../components/student/DailyPracticeSection';
-import JobCard from '../components/student/JobCard';
 import ProfileSection from '../components/student/ProfileSection';
+import JobCard from '../components/student/JobCard';
 import SkillBar from '../components/student/SkillBar';
+import DailyPracticeSection from '../components/student/DailyPracticeSection';
 import { PAGES } from '../data/constants';
+import { jobsData } from '../data/jobsData';
 
 const StudentDashboard = ({ 
   currentStreak, 
   longestStreak, 
   solvedToday,
   profileData,
-  onNavigate 
+  onNavigate,
+  onJobClick 
 }) => {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -25,7 +27,7 @@ const StudentDashboard = ({
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <StatCard title="Profile Score" value="85%" color="green" />
-          <StatCard title="Job Matches" value="12" color="blue" />
+          <StatCard title="Job Matches" value={jobsData.length} color="blue" />
           <StatCard title="Applications" value="5" color="purple" />
           <StatCard title="Current Streak" value={`${currentStreak}🔥`} color="orange" />
         </div>
@@ -43,9 +45,13 @@ const StudentDashboard = ({
               AI Recommended Jobs
             </h3>
             <div className="space-y-3">
-              <JobCard company="Tech Corp" role="Software Engineer" match="95%" />
-              <JobCard company="InnovateLabs" role="Frontend Developer" match="88%" />
-              <JobCard company="DataSystems" role="ML Engineer" match="82%" />
+              {jobsData.map((job) => (
+                <JobCard 
+                  key={job.id}
+                  job={job}
+                  onApplyClick={onJobClick}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -61,13 +67,16 @@ const StudentDashboard = ({
         <div className="mt-6 bg-white rounded-lg shadow p-6">
           <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            Skill Gap Insights
+            Your Skills Overview
           </h3>
           <div className="space-y-3">
             <SkillBar skill="React.js" level={90} />
             <SkillBar skill="Node.js" level={75} />
             <SkillBar skill="System Design" level={60} recommended />
           </div>
+          <p className="text-sm text-gray-600 mt-4 italic">
+            💡 View detailed skill gap analysis for each job in the job details page!
+          </p>
         </div>
       </div>
     </div>
