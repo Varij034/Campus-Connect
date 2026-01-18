@@ -1,0 +1,66 @@
+{
+  "family": "campus-connect-neo4j",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "containerDefinitions": [
+    {
+      "name": "neo4j",
+      "image": "neo4j:5-community",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 7474,
+          "protocol": "tcp"
+        },
+        {
+          "containerPort": 7687,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "NEO4J_AUTH",
+          "value": "neo4j/<PASSWORD>"
+        },
+        {
+          "name": "NEO4J_PLUGINS",
+          "value": "[\"apoc\"]"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "NEO4J_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:neo4j-password"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "neo4j-data",
+          "containerPath": "/data"
+        },
+        {
+          "sourceVolume": "neo4j-logs",
+          "containerPath": "/logs"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/campus-connect-neo4j",
+          "awslogs-region": "<REGION>",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "neo4j-data"
+    },
+    {
+      "name": "neo4j-logs"
+    }
+  ]
+}

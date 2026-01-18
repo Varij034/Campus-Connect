@@ -1,0 +1,61 @@
+{
+  "family": "campus-connect-weaviate",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "containerDefinitions": [
+    {
+      "name": "weaviate",
+      "image": "semitechnologies/weaviate:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "QUERY_DEFAULTS_LIMIT",
+          "value": "25"
+        },
+        {
+          "name": "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "PERSISTENCE_DATA_PATH",
+          "value": "/var/lib/weaviate"
+        },
+        {
+          "name": "DEFAULT_VECTORIZER_MODULE",
+          "value": "none"
+        },
+        {
+          "name": "ENABLE_MODULES",
+          "value": "text2vec-openai,text2vec-cohere,text2vec-huggingface"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "weaviate-data",
+          "containerPath": "/var/lib/weaviate"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/campus-connect-weaviate",
+          "awslogs-region": "<REGION>",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "weaviate-data"
+    }
+  ]
+}

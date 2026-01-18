@@ -1,0 +1,19 @@
+# Production overrides
+services:
+  backend:
+    environment:
+      - ENVIRONMENT=production
+      - API_RELOAD=false
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

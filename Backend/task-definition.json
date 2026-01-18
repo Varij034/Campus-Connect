@@ -1,0 +1,118 @@
+{
+  "family": "campus-connect-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "<ACCOUNT-ID>.dkr.ecr.<REGION>.amazonaws.com/campus-connect-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "ENVIRONMENT",
+          "value": "production"
+        },
+        {
+          "name": "API_HOST",
+          "value": "0.0.0.0"
+        },
+        {
+          "name": "API_PORT",
+          "value": "8000"
+        },
+        {
+          "name": "POSTGRES_PORT",
+          "value": "5432"
+        },
+        {
+          "name": "POSTGRES_USER",
+          "value": "postgres"
+        },
+        {
+          "name": "POSTGRES_DB",
+          "value": "campus_connect"
+        },
+        {
+          "name": "MONGODB_DB",
+          "value": "campus_connect"
+        },
+        {
+          "name": "REDIS_PORT",
+          "value": "6379"
+        },
+        {
+          "name": "ALGORITHM",
+          "value": "HS256"
+        },
+        {
+          "name": "ACCESS_TOKEN_EXPIRE_MINUTES",
+          "value": "30"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "POSTGRES_HOST",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:rds-endpoint"
+        },
+        {
+          "name": "POSTGRES_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:rds-password"
+        },
+        {
+          "name": "MONGODB_URL",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:documentdb-url"
+        },
+        {
+          "name": "REDIS_HOST",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:redis-endpoint"
+        },
+        {
+          "name": "WEAVIATE_URL",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:weaviate-url"
+        },
+        {
+          "name": "NEO4J_URI",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:neo4j-uri"
+        },
+        {
+          "name": "NEO4J_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:neo4j-password"
+        },
+        {
+          "name": "SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:jwt-secret-key"
+        },
+        {
+          "name": "CORS_ORIGINS",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT-ID>:secret:cors-origins"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/campus-connect-backend",
+          "awslogs-region": "<REGION>",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python -c \"import requests; requests.get('http://localhost:8000/health')\" || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
