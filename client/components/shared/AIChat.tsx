@@ -2,13 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, Sparkles } from 'lucide-react';
+import { Send, Bot, User } from 'lucide-react';
+import { chatApi } from '@/lib/api';
+import { ApiException } from '@/lib/api';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  error?: boolean;
 }
 
 interface AIChatProps {
@@ -58,22 +61,47 @@ export default function AIChat({ role }: AIChatProps) {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = input;
     setInput('');
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
+    try {
+      // Only use chat API for HR role
+      if (role === 'hr') {
+        const response = await chatApi.sendMessage(userInput);
+        
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: response.response,
+          timestamp: new Date(),
+        };
+        
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        // For student role, keep the mock response for now
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: "I understand you're looking for opportunities. Let me search our database for positions that match your profile. Based on your skills, I've found several relevant positions. Would you like me to show you the details?",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
+    } catch (error) {
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: role === 'student'
-          ? "I understand you're looking for opportunities. Let me search our database for positions that match your profile. Based on your skills, I've found several relevant positions. Would you like me to show you the details?"
-          : "I'll help you find suitable candidates. Based on your job requirements, I've identified several potential matches. Would you like me to show you their profiles?",
+        content: error instanceof ApiException
+          ? `Sorry, I encountered an error: ${error.message}. Please try again.`
+          : "Sorry, I encountered an error. Please try again.",
         timestamp: new Date(),
+        error: true,
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -81,6 +109,65 @@ export default function AIChat({ role }: AIChatProps) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // Format message content with markdown-like syntax
+  const formatMessage = (content: string) => {
+    const lines = content.split('\n');
+    const elements: React.ReactNode[] = [];
+    
+    lines.forEach((line, lineIndex) => {
+      if (line.trim() === '') {
+        elements.push(<br key={`br-${lineIndex}`} />);
+        return;
+      }
+      
+      // Check if it's a bullet point
+      if (line.trim().startsWith('•')) {
+        const bulletContent = line.trim().substring(1).trim();
+        elements.push(
+          <div key={`bullet-${lineIndex}`} className="flex items-start gap-2 my-1">
+            <span className="text-primary mt-1">•</span>
+            <span>{formatBoldText(bulletContent)}</span>
+          </div>
+        );
+      } else {
+        // Regular line with potential bold text
+        elements.push(
+          <div key={`line-${lineIndex}`} className="my-1">
+            {formatBoldText(line)}
+          </div>
+        );
+      }
+    });
+    
+    return elements;
+  };
+
+  // Format bold text (**text**)
+  const formatBoldText = (text: string): React.ReactNode[] => {
+    const parts: React.ReactNode[] = [];
+    const boldRegex = /\*\*(.+?)\*\*/g;
+    let lastIndex = 0;
+    let match;
+    let key = 0;
+
+    while ((match = boldRegex.exec(text)) !== null) {
+      // Add text before the bold
+      if (match.index > lastIndex) {
+        parts.push(<span key={`text-${key++}`}>{text.substring(lastIndex, match.index)}</span>);
+      }
+      // Add bold text
+      parts.push(<strong key={`bold-${key++}`} className="font-semibold">{match[1]}</strong>);
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(<span key={`text-${key++}`}>{text.substring(lastIndex)}</span>);
+    }
+
+    return parts.length > 0 ? parts : [<span key="text">{text}</span>];
   };
 
   return (
@@ -115,13 +202,13 @@ export default function AIChat({ role }: AIChatProps) {
                     className={`rounded-2xl px-4 py-3 ${
                       message.role === 'user'
                         ? 'bg-primary text-primary-content ml-auto'
+                        : message.error
+                        ? 'bg-error/20 text-error border border-error/30'
                         : 'bg-base-200 text-base-content'
                     }`}
                   >
-                    <div className="prose prose-sm max-w-none">
-                      <p className="text-base leading-relaxed whitespace-pre-wrap">
-                        {message.content}
-                      </p>
+                    <div className="text-base leading-relaxed">
+                      {formatMessage(message.content)}
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { Token, User, ApiError, Job, JobCreate, JobSearchResponse } from '@/types/api';
+import { Token, User, ApiError, Job, JobCreate, JobSearchResponse, ATSScoreRequest, ATSScoreResponse, EvaluationResponse, BatchScoreRequest, BatchScoreResponse, Candidate, ChatMessageRequest, ChatMessageResponse } from '@/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -200,6 +200,107 @@ export const studentApi = {
         query,
         student_skills: studentSkills,
         top_k: topK,
+      }),
+    });
+  },
+};
+
+// ATS API
+export const atsApi = {
+  score: async (request: ATSScoreRequest): Promise<ATSScoreResponse> => {
+    return apiRequest<ATSScoreResponse>('/api/v1/ats/score', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+
+  getEvaluation: async (evaluationId: number): Promise<EvaluationResponse> => {
+    return apiRequest<EvaluationResponse>(`/api/v1/ats/evaluation/${evaluationId}`);
+  },
+
+  batchScore: async (requests: ATSScoreRequest[]): Promise<BatchScoreResponse> => {
+    return apiRequest<BatchScoreResponse>('/api/v1/ats/batch-score', {
+      method: 'POST',
+      body: JSON.stringify(requests),
+    });
+  },
+
+  createEvaluation: async (candidateId: number, jobId: number): Promise<EvaluationResponse> => {
+    return apiRequest<EvaluationResponse>('/api/v1/ats/create-evaluation', {
+      method: 'POST',
+      body: JSON.stringify({ candidate_id: candidateId, job_id: jobId }),
+    });
+  },
+};
+
+// Candidates API
+export const candidatesApi = {
+  list: async (skip = 0, limit = 100): Promise<Candidate[]> => {
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString(),
+    });
+    
+    return apiRequest<Candidate[]>(`/api/v1/candidates?${params.toString()}`);
+  },
+
+  get: async (candidateId: number): Promise<Candidate> => {
+    return apiRequest<Candidate>(`/api/v1/candidates/${candidateId}`);
+  },
+
+  getEvaluations: async (candidateId: number): Promise<EvaluationResponse[]> => {
+    return apiRequest<EvaluationResponse[]>(`/api/v1/candidates/${candidateId}/evaluations`);
+  },
+};
+
+// Resume API
+export const resumeApi = {
+  get: async (resumeId: string): Promise<{ resume_id: string; parsed_data: any; raw_text?: string; message: string }> => {
+    return apiRequest<{ resume_id: string; parsed_data: any; raw_text?: string; message: string }>(`/api/v1/resume/${resumeId}`);
+  },
+
+  download: async (resumeId: string, filename: string = 'resume.txt'): Promise<void> => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/resume/${resumeId}`, {
+      headers: headers as HeadersInit,
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      const errorMessage = data.detail || data.message || `HTTP ${response.status}`;
+      throw new ApiException(response.status, errorMessage, data);
+    }
+
+    const data = await response.json();
+    const rawText = data.raw_text || data.parsed_data?.raw_text || '';
+    
+    // Create a blob and download
+    const blob = new Blob([rawText], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+};
+
+// Chat API
+export const chatApi = {
+  sendMessage: async (message: string, conversationId?: string): Promise<ChatMessageResponse> => {
+    return apiRequest<ChatMessageResponse>('/api/v1/chat/message', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId,
       }),
     });
   },

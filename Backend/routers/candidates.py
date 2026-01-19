@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from database.postgres import get_db
 from database.mongodb import get_mongo_db
-from database.models import User, Candidate, Application, Evaluation
+from database.models import User, Candidate, Application, Evaluation, Job
 from database.schemas import (
     CandidateResponse, CandidateCreate, CandidateUpdate,
     ApplicationResponse, EvaluationResponse
@@ -129,7 +129,7 @@ async def list_candidates(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """List all candidates"""
+    """List all candidates and automatically create evaluations for applications"""
     # Only recruiters and admins can list candidates
     if current_user.role.value not in ["recruiter", "admin"]:
         raise HTTPException(
@@ -138,6 +138,32 @@ async def list_candidates(
         )
     
     candidates = db.query(Candidate).offset(skip).limit(limit).all()
+    
+    # Automatically create evaluations for all applications that don't have evaluations
+    # Import here to avoid circular imports
+    from routers.ats import create_evaluation_for_application
+    
+    for candidate in candidates:
+        if candidate.resume_id:  # Only process candidates with resumes
+            # Get all applications for this candidate
+            applications = db.query(Application).filter(
+                Application.candidate_id == candidate.id
+            ).all()
+            
+            for application in applications:
+                # Check if evaluation already exists
+                existing_eval = db.query(Evaluation).filter(
+                    Evaluation.application_id == application.id
+                ).first()
+                
+                if not existing_eval:
+                    # Automatically create evaluation
+                    try:
+                        create_evaluation_for_application(application, db)
+                    except Exception:
+                        # Silently fail if evaluation creation fails (e.g., missing resume/job requirements)
+                        pass
+    
     return candidates
 
 

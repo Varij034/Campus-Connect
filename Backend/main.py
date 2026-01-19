@@ -18,7 +18,7 @@ from database.postgres import engine, Base
 # MongoDB client will be imported where needed to handle None case
 
 # Import routers
-from routers import auth, resume, ats, feedback, student, jobs, candidates
+from routers import auth, resume, ats, feedback, student, jobs, candidates, chat
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -46,6 +46,7 @@ app.include_router(feedback.router)
 app.include_router(student.router)
 app.include_router(jobs.router)
 app.include_router(candidates.router)
+app.include_router(chat.router)
 
 
 @app.on_event("startup")
@@ -98,6 +99,7 @@ async def root():
             "student": "/api/v1/student/*",
             "jobs": "/api/v1/jobs/*",
             "candidates": "/api/v1/candidates/*",
+            "chat": "/api/v1/chat/*",
             "docs": "/docs",
             "health": "/health"
         }

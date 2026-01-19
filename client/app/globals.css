@@ -181,7 +181,7 @@ button, a, input, textarea, select {
   .select-bordered,
   .textarea,
   .textarea-bordered {
-    border-radius: 9999px !important;
+    border-radius: 25px !important;
   }
   
   /* Modern card styling with borders and clean shadows (shadcn/ui style) */

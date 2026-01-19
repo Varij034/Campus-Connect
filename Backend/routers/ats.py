@@ -2,13 +2,14 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import uuid
 from database.postgres import get_db
 from database.mongodb import get_mongo_db
-from database.models import User, Job, Application, Evaluation
+from database.models import User, Job, Application, Evaluation, Candidate, ApplicationStatus
 from database.schemas import ATSScoreRequest, ATSScoreResponse, EvaluationResponse
 from models import JobRequirement, ResumeData
+from pydantic import BaseModel
 from ats_engine import ATSEngine
 from resume_parser import ResumeParser
 from auth.dependencies import get_current_active_user
@@ -32,7 +33,17 @@ async def score_resume(
         resume_data = None
         if request.resume_id:
             mongo_db = get_mongo_db()
+            # Try to find by resume_id field first (for API-uploaded resumes)
             resume_doc = mongo_db.resumes.find_one({"resume_id": request.resume_id})
+            
+            # If not found, try to find by _id (for seeded resumes)
+            if not resume_doc:
+                try:
+                    from bson import ObjectId
+                    resume_doc = mongo_db.resumes.find_one({"_id": ObjectId(request.resume_id)})
+                except:
+                    pass
+            
             if not resume_doc:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -130,3 +141,214 @@ async def batch_score(
             results.append({"error": str(e)})
     
     return {"results": results, "total": len(results)}
+
+
+def create_evaluation_for_application(application: Application, db: Session) -> Optional[Evaluation]:
+    """Helper function to create an evaluation for an application"""
+    try:
+        # Check if evaluation already exists
+        existing_evaluation = db.query(Evaluation).filter(
+            Evaluation.application_id == application.id
+        ).first()
+        if existing_evaluation:
+            return existing_evaluation
+        
+        candidate = application.candidate
+        job = application.job
+        
+        # Check if candidate has a resume
+        if not candidate.resume_id:
+            return None
+        
+        # Get resume data - handle both resume_id field and _id (ObjectId) cases
+        mongo_db = get_mongo_db()
+        
+        # First, try to find by resume_id field (for API-uploaded resumes)
+        resume_doc = mongo_db.resumes.find_one({"resume_id": candidate.resume_id})
+        
+        # If not found, try to find by _id (for seeded resumes where resume_id is the MongoDB _id)
+        if not resume_doc:
+            try:
+                from bson import ObjectId
+                resume_doc = mongo_db.resumes.find_one({"_id": ObjectId(candidate.resume_id)})
+            except (ValueError, TypeError):
+                pass
+        
+        # If still not found, try to find by user_id as a fallback
+        if not resume_doc:
+            resume_doc = mongo_db.resumes.find_one({"user_id": candidate.user_id})
+        
+        if not resume_doc:
+            return None
+        
+        parsed_data = resume_doc.get("parsed_data", {})
+        if not parsed_data:
+            return None
+        
+        resume_data = ResumeData(**parsed_data)
+        
+        # Get job requirements
+        if not job.requirements_json:
+            return None
+        
+        job_requirement = JobRequirement(**job.requirements_json)
+        
+        # Score resume
+        ats_result = ats_engine.score_resume(resume_data, job_requirement)
+        
+        # Create evaluation
+        evaluation = Evaluation(
+            application_id=application.id,
+            ats_score=ats_result["ats_score"],
+            passed=ats_result["passed"],
+            skill_match_score=ats_result.get("skill_match_score"),
+            education_score=ats_result.get("education_score"),
+            experience_score=ats_result.get("experience_score"),
+            keyword_match_score=ats_result.get("keyword_match_score"),
+            format_score=ats_result.get("format_score"),
+            matched_skills_json=ats_result.get("matched_skills", []),
+            missing_skills_json=ats_result.get("missing_skills", [])
+        )
+        
+        db.add(evaluation)
+        db.commit()
+        db.refresh(evaluation)
+        
+        return evaluation
+    except Exception as e:
+        db.rollback()
+        return None
+
+
+class CreateEvaluationRequest(BaseModel):
+    candidate_id: int
+    job_id: int
+
+
+@router.post("/create-evaluation", response_model=EvaluationResponse)
+async def create_evaluation(
+    request: CreateEvaluationRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Create an evaluation for a candidate against a job"""
+    # Only recruiters and admins can create evaluations
+    if current_user.role.value not in ["recruiter", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only recruiters and admins can create evaluations"
+        )
+    
+    try:
+        # Get candidate
+        candidate = db.query(Candidate).filter(Candidate.id == request.candidate_id).first()
+        if not candidate:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Candidate not found"
+            )
+        
+        # Get job
+        job = db.query(Job).filter(Job.id == request.job_id).first()
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job not found"
+            )
+        
+        # Check if candidate has a resume
+        if not candidate.resume_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Candidate does not have a resume uploaded"
+            )
+        
+        # Get or create application
+        application = db.query(Application).filter(
+            Application.candidate_id == request.candidate_id,
+            Application.job_id == request.job_id
+        ).first()
+        
+        if not application:
+            application = Application(
+                candidate_id=request.candidate_id,
+                job_id=request.job_id,
+                status=ApplicationStatus.PENDING
+            )
+            db.add(application)
+            db.flush()  # Flush to get the application ID
+        
+        # Get resume data - handle both resume_id field and _id (ObjectId) cases
+        mongo_db = get_mongo_db()
+        
+        # First, try to find by resume_id field (for API-uploaded resumes)
+        resume_doc = mongo_db.resumes.find_one({"resume_id": candidate.resume_id})
+        
+        # If not found, try to find by _id (for seeded resumes where resume_id is the MongoDB _id)
+        if not resume_doc:
+            try:
+                from bson import ObjectId
+                resume_doc = mongo_db.resumes.find_one({"_id": ObjectId(candidate.resume_id)})
+            except (ValueError, TypeError):
+                # candidate.resume_id is not a valid ObjectId, continue to next attempt
+                pass
+        
+        # If still not found, try to find by user_id as a fallback
+        if not resume_doc:
+            resume_doc = mongo_db.resumes.find_one({"user_id": candidate.user_id})
+        
+        if not resume_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume not found for candidate '{candidate.name}'. The candidate has resume_id '{candidate.resume_id}' but no matching resume document exists in the database."
+            )
+        
+        parsed_data = resume_doc.get("parsed_data", {})
+        if not parsed_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Resume document found but parsed_data is missing or empty"
+            )
+        
+        resume_data = ResumeData(**parsed_data)
+        
+        # Get job requirements
+        if not job.requirements_json:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Job does not have requirements defined"
+            )
+        
+        job_requirement = JobRequirement(**job.requirements_json)
+        
+        # Score resume
+        ats_result = ats_engine.score_resume(resume_data, job_requirement)
+        
+        # Create evaluation
+        evaluation = Evaluation(
+            application_id=application.id,
+            ats_score=ats_result["ats_score"],
+            passed=ats_result["passed"],
+            skill_match_score=ats_result.get("skill_match_score"),
+            education_score=ats_result.get("education_score"),
+            experience_score=ats_result.get("experience_score"),
+            keyword_match_score=ats_result.get("keyword_match_score"),
+            format_score=ats_result.get("format_score"),
+            matched_skills_json=ats_result.get("matched_skills", []),
+            missing_skills_json=ats_result.get("missing_skills", [])
+        )
+        
+        db.add(evaluation)
+        db.commit()
+        db.refresh(evaluation)
+        
+        return evaluation
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating evaluation: {str(e)}"
+        )

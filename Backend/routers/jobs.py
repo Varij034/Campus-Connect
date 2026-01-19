@@ -6,7 +6,7 @@ from typing import List, Optional
 import uuid
 from database.postgres import get_db
 from database.mongodb import get_mongo_db
-from database.models import User, Job
+from database.models import User, Job, Application
 from database.schemas import JobCreate, JobUpdate, JobResponse
 from auth.dependencies import get_current_active_user
 
@@ -31,7 +31,27 @@ async def list_jobs(
         query = query.filter(Job.title.ilike(f"%{title}%"))
     
     jobs = query.offset(skip).limit(limit).all()
-    return jobs
+    
+    # Add application count for each job
+    result = []
+    for job in jobs:
+        application_count = db.query(Application).filter(Application.job_id == job.id).count()
+        job_dict = {
+            "id": job.id,
+            "title": job.title,
+            "company": job.company,
+            "description": job.description,
+            "location": job.location,
+            "salary": job.salary,
+            "requirements_json": job.requirements_json,
+            "created_by": job.created_by,
+            "created_at": job.created_at,
+            "updated_at": job.updated_at,
+            "application_count": application_count
+        }
+        result.append(JobResponse(**job_dict))
+    
+    return result
 
 
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
@@ -92,7 +112,23 @@ async def get_job(
             detail="Job not found"
         )
     
-    return job
+    # Add application count
+    application_count = db.query(Application).filter(Application.job_id == job_id).count()
+    job_dict = {
+        "id": job.id,
+        "title": job.title,
+        "company": job.company,
+        "description": job.description,
+        "location": job.location,
+        "salary": job.salary,
+        "requirements_json": job.requirements_json,
+        "created_by": job.created_by,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "application_count": application_count
+    }
+    
+    return JobResponse(**job_dict)
 
 
 @router.put("/{job_id}", response_model=JobResponse)

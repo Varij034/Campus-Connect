@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses"""
 
 from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 
@@ -69,6 +69,7 @@ class JobResponse(BaseModel):
     created_by: int
     created_at: datetime
     updated_at: Optional[datetime]
+    application_count: Optional[int] = 0  # Number of applications for this job
 
     class Config:
         from_attributes = True
@@ -258,3 +259,15 @@ class RejectionInterpretResponse(BaseModel):
     motivational_message: str
     next_steps: List[str]
     raw_feedback: str
+
+
+# Chat Schemas
+class ChatMessageRequest(BaseModel):
+    message: str
+    conversation_id: Optional[str] = None
+
+
+class ChatMessageResponse(BaseModel):
+    response: str
+    data: Optional[Union[Dict[str, Any], List[Any]]] = None
+    conversation_id: Optional[str] = None
