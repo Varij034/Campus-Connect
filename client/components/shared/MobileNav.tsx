@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, 
   X, 
@@ -17,6 +17,7 @@ import {
   Users,
   ClipboardList
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileNavProps {
   role: 'student' | 'hr';
@@ -25,6 +26,14 @@ interface MobileNavProps {
 export default function MobileNav({ role }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    setIsOpen(false);
+    router.push('/auth/login');
+  };
 
   const studentLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -86,7 +95,10 @@ export default function MobileNav({ role }: MobileNavProps) {
               })}
             </ul>
             <div className="mt-8">
-              <button className="flex items-center gap-3 px-4 py-3 rounded-lg text-base-content hover:bg-base-300 w-full transition-colors">
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-base-content hover:bg-base-300 w-full transition-colors"
+              >
                 <LogOut className="w-5 h-5" />
                 <span>Logout</span>
               </button>

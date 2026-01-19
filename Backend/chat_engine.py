@@ -1,5 +1,5 @@
 """
-Chat Engine for HR AI Assistant
+Chat Engine for HR AI Assistant and Student AI Assistant
 Handles intent classification, data retrieval, and response generation
 """
 
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from database.models import Job, Candidate, Application, Evaluation, ApplicationStatus
 from database.schemas import JobResponse, CandidateResponse, EvaluationResponse
+from student_engine import CampusConnectStudentEngine
 
 
 class IntentClassifier:
@@ -173,6 +174,114 @@ class IntentClassifier:
             return ("list_candidates", {})
         
         # Default to general help
+        return ("help", {})
+
+
+class StudentIntentClassifier:
+    """Classifies student queries into specific intents"""
+    
+    # Job search patterns
+    JOB_SEARCH_PATTERNS = [
+        r'\b(find|search|show|get|list|recommend).*jobs?\b',
+        r'\bjobs?\s+(?:for|with|in|using)\s+(\w+(?:\s+\w+)*)',
+        r'\b(backend|frontend|full.?stack|python|java|javascript|react|node).*jobs?\b',
+        r'\bpositions?\s+(?:for|in)\s+(\w+(?:\s+\w+)*)',
+    ]
+    
+    # Skill gap patterns
+    SKILL_GAP_PATTERNS = [
+        r'\b(what|which|what are).*skills?\s+(?:do I|I need|required|missing)',
+        r'\bskill\s+gap',
+        r'\bmissing\s+skills?',
+        r'\banalyze\s+(?:my\s+)?skills?',
+        r'\bwhat\s+skills?\s+for\s+job',
+    ]
+    
+    # Application status patterns
+    APPLICATION_STATUS_PATTERNS = [
+        r'\bmy\s+applications?',
+        r'\bwhere\s+(?:did|have)\s+I\s+applied',
+        r'\bapplication\s+status',
+        r'\bshow\s+my\s+applications?',
+        r'\bstatus\s+of\s+my\s+applications?',
+    ]
+    
+    # Resume feedback patterns
+    RESUME_FEEDBACK_PATTERNS = [
+        r'\bresume\s+feedback',
+        r'\bimprove\s+(?:my\s+)?resume',
+        r'\bresume\s+tips?',
+        r'\bhow\s+to\s+improve\s+resume',
+        r'\bresume\s+for\s+job',
+    ]
+    
+    # Rejection interpretation patterns
+    REJECTION_PATTERNS = [
+        r'\bwhy\s+(?:was I|am I|did I get)\s+rejected',
+        r'\brejection\s+reason',
+        r'\bexplain\s+(?:this\s+)?rejection',
+        r'\bwhy\s+rejected',
+    ]
+    
+    # Job detail patterns
+    JOB_DETAIL_PATTERNS = [
+        r'\bjob\s+(\d+)\b',
+        r'\bdetails?\s+(?:for|of)\s+job\s+(\d+)\b',
+        r'\bshow\s+job\s+(\d+)\b',
+    ]
+    
+    def classify(self, message: str) -> Tuple[str, Dict[str, Any]]:
+        """Classify student message into intent"""
+        message_lower = message.lower().strip()
+        
+        # Check for job detail queries
+        job_id_match = re.search(self.JOB_DETAIL_PATTERNS[0], message_lower)
+        if job_id_match:
+            # Check if it's asking for skill gap
+            if any(re.search(pattern, message_lower) for pattern in self.SKILL_GAP_PATTERNS):
+                return ("analyze_skill_gap_for_job", {"job_id": int(job_id_match.group(1))})
+            return ("get_job_details", {"job_id": int(job_id_match.group(1))})
+        
+        # Check for skill gap queries
+        if any(re.search(pattern, message_lower) for pattern in self.SKILL_GAP_PATTERNS):
+            # Try to extract job ID
+            job_id_match = re.search(r'\bjob\s+(\d+)\b', message_lower)
+            if job_id_match:
+                return ("analyze_skill_gap_for_job", {"job_id": int(job_id_match.group(1))})
+            return ("analyze_skill_gap", {})
+        
+        # Check for application status
+        if any(re.search(pattern, message_lower) for pattern in self.APPLICATION_STATUS_PATTERNS):
+            return ("get_my_applications", {})
+        
+        # Check for resume feedback
+        if any(re.search(pattern, message_lower) for pattern in self.RESUME_FEEDBACK_PATTERNS):
+            # Try to extract job ID
+            job_id_match = re.search(r'\bjob\s+(\d+)\b', message_lower)
+            if job_id_match:
+                return ("get_resume_feedback", {"job_id": int(job_id_match.group(1))})
+            return ("get_resume_feedback", {})
+        
+        # Check for rejection interpretation
+        if any(re.search(pattern, message_lower) for pattern in self.REJECTION_PATTERNS):
+            # Try to extract job ID
+            job_id_match = re.search(r'\bjob\s+(\d+)\b', message_lower)
+            if job_id_match:
+                return ("interpret_rejection", {"job_id": int(job_id_match.group(1))})
+            return ("interpret_rejection", {})
+        
+        # Check for job search
+        if any(re.search(pattern, message_lower) for pattern in self.JOB_SEARCH_PATTERNS):
+            # Extract technology/skill from query
+            tech_match = re.search(r'\b(backend|frontend|full.?stack|python|java|javascript|react|node|angular|vue|django|flask|spring)\b', message_lower)
+            tech = tech_match.group(1) if tech_match else None
+            return ("search_jobs", {"query": message, "technology": tech})
+        
+        # Default to job search if it contains job-related keywords
+        if re.search(r'\b(jobs?|positions?|roles?|opportunities?)\b', message_lower):
+            return ("search_jobs", {"query": message})
+        
+        # Default to help
         return ("help", {})
 
 
@@ -496,6 +605,155 @@ class DataRetriever:
                 "average_score": round(avg_score, 2),
             },
         }
+    
+    # Student-specific methods
+    def get_student_profile(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get student's candidate profile"""
+        candidate = self.db.query(Candidate).filter(Candidate.user_id == user_id).first()
+        
+        if not candidate:
+            return None
+        
+        return {
+            "id": candidate.id,
+            "name": candidate.name,
+            "email": candidate.email,
+            "phone": candidate.phone,
+            "skills": candidate.skills_json or [],
+            "resume_id": candidate.resume_id,
+            "created_at": candidate.created_at.isoformat() if candidate.created_at else None,
+        }
+    
+    def get_student_applications(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all applications for a student"""
+        candidate = self.db.query(Candidate).filter(Candidate.user_id == user_id).first()
+        
+        if not candidate:
+            return []
+        
+        applications = self.db.query(Application).filter(
+            Application.candidate_id == candidate.id
+        ).order_by(Application.applied_at.desc()).all()
+        
+        result = []
+        for app in applications:
+            job = self.db.query(Job).filter(Job.id == app.job_id).first()
+            
+            # Get evaluation if exists
+            evaluation = self.db.query(Evaluation).filter(
+                Evaluation.application_id == app.id
+            ).first()
+            
+            result.append({
+                "id": app.id,
+                "job_id": app.job_id,
+                "job_title": job.title if job else "Unknown",
+                "company": job.company if job else "Unknown",
+                "status": app.status.value,
+                "applied_at": app.applied_at.isoformat() if app.applied_at else None,
+                "ats_score": evaluation.ats_score if evaluation else None,
+                "passed": evaluation.passed if evaluation else None,
+            })
+        
+        return result
+    
+    def get_student_evaluations(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get evaluations for student's applications"""
+        candidate = self.db.query(Candidate).filter(Candidate.user_id == user_id).first()
+        
+        if not candidate:
+            return []
+        
+        return self.get_candidate_evaluations(candidate.id)
+    
+    def search_jobs_for_student(self, query: str, student_skills: List[str], top_k: int = 10) -> List[Dict[str, Any]]:
+        """Search jobs using student engine"""
+        from student_engine import CampusConnectStudentEngine
+        
+        # Get all jobs
+        jobs = self.db.query(Job).all()
+        
+        # Convert to list of dicts
+        jobs_list = []
+        for job in jobs:
+            requirements = job.requirements_json or {}
+            jobs_list.append({
+                "id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "salary": job.salary,
+                "description": job.description or "",
+                "requirements": requirements.get("job_description", "") or 
+                              f"{', '.join(requirements.get('required_skills', []))}"
+            })
+        
+        # Use student engine
+        student_engine = CampusConnectStudentEngine()
+        results = student_engine.search_jobs(
+            student_query=query,
+            jobs=jobs_list,
+            student_skills=student_skills,
+            top_k=top_k
+        )
+        
+        return results
+    
+    def analyze_skill_gap_for_job(self, job_id: int, student_skills: List[str]) -> Optional[Dict[str, Any]]:
+        """Analyze skill gap for a specific job"""
+        from student_engine import CampusConnectStudentEngine
+        
+        job = self.db.query(Job).filter(Job.id == job_id).first()
+        
+        if not job:
+            return None
+        
+        requirements = job.requirements_json or {}
+        job_skills = requirements.get("required_skills", [])
+        
+        student_engine = CampusConnectStudentEngine()
+        result = student_engine.analyze_skill_gap(
+            student_skills=student_skills,
+            job_skills=job_skills,
+            job_role=job.title
+        )
+        
+        return {
+            "job_id": job_id,
+            "job_title": job.title,
+            "company": job.company,
+            **result
+        }
+    
+    def get_job_details_for_student(self, job_id: int, student_skills: List[str]) -> Optional[Dict[str, Any]]:
+        """Get job details with match analysis for student"""
+        job = self.db.query(Job).filter(Job.id == job_id).first()
+        
+        if not job:
+            return None
+        
+        # Get basic job info
+        job_data = {
+            "id": job.id,
+            "title": job.title,
+            "company": job.company,
+            "description": job.description,
+            "location": job.location,
+            "salary": job.salary,
+            "requirements": job.requirements_json or {},
+        }
+        
+        # Add skill gap analysis if student has skills
+        if student_skills:
+            skill_gap = self.analyze_skill_gap_for_job(job_id, student_skills)
+            if skill_gap:
+                job_data["skill_gap"] = {
+                    "missing_skills": skill_gap.get("missing_skills", []),
+                    "matched_skills": skill_gap.get("matched_skills", []),
+                    "match_percentage": skill_gap.get("match_percentage", 0.0),
+                }
+        
+        return job_data
 
 
 class ResponseGenerator:
@@ -687,6 +945,179 @@ You can use candidate names or IDs. Just ask me in natural language and I'll hel
             return "I'm not sure how to help with that. Try asking about jobs, candidates, evaluations, or statistics."
 
 
+class StudentResponseGenerator:
+    """Generates natural language responses for student queries"""
+    
+    def generate(self, intent: str, data: Any, params: Dict[str, Any] = None, student_skills: List[str] = None) -> str:
+        """Generate response based on intent and data"""
+        params = params or {}
+        student_skills = student_skills or []
+        
+        if intent == "search_jobs":
+            if not data:
+                return "I couldn't find any jobs matching your search. Try different keywords or skills."
+            
+            if len(data) == 1:
+                job = data[0]
+                status_emoji = "✅" if job.get("application_status") == "Direct Apply Eligible" else "💡"
+                response = f"{status_emoji} I found 1 job matching your search:\n\n"
+                response += f"**{job.get('title', 'Unknown')}** at {job.get('company', 'Unknown')}\n"
+                response += f"Match Score: {job.get('match_score', 0):.1f}%\n"
+                response += f"Status: {job.get('application_status', 'Recommended')}\n"
+                if job.get('matched_skills'):
+                    response += f"\nMatched Skills: {', '.join(job['matched_skills'][:5])}\n"
+                if job.get('missing_skills'):
+                    response += f"Missing Skills: {', '.join(job['missing_skills'][:5])}\n"
+                return response
+            
+            response = f"I found {len(data)} jobs matching your search:\n\n"
+            for job in data[:10]:
+                status_emoji = "✅" if job.get("application_status") == "Direct Apply Eligible" else "💡"
+                response += f"{status_emoji} **{job.get('title', 'Unknown')}** at {job.get('company', 'Unknown')}\n"
+                response += f"   Match: {job.get('match_score', 0):.1f}% | {job.get('application_status', 'Recommended')}\n"
+                if job.get('matched_skills'):
+                    response += f"   Skills: {', '.join(job['matched_skills'][:3])}\n"
+                response += "\n"
+            
+            if len(data) > 10:
+                response += f"... and {len(data) - 10} more jobs."
+            
+            return response
+        
+        elif intent == "get_job_details":
+            if not data:
+                return f"I couldn't find job {params.get('job_id', '')} in the system."
+            
+            job = data
+            response = f"**Job Details (ID: {job['id']}):**\n\n"
+            response += f"Title: **{job['title']}**\n"
+            response += f"Company: {job['company']}\n"
+            if job.get('location'):
+                response += f"Location: {job['location']}\n"
+            if job.get('salary'):
+                response += f"Salary: {job['salary']}\n"
+            
+            if job.get('skill_gap'):
+                skill_gap = job['skill_gap']
+                response += f"\n**Skill Match Analysis:**\n"
+                response += f"Match: {skill_gap.get('match_percentage', 0):.1f}%\n"
+                if skill_gap.get('matched_skills'):
+                    response += f"✅ Matched: {', '.join(skill_gap['matched_skills'][:5])}\n"
+                if skill_gap.get('missing_skills'):
+                    response += f"❌ Missing: {', '.join(skill_gap['missing_skills'][:5])}\n"
+            
+            return response
+        
+        elif intent == "analyze_skill_gap" or intent == "analyze_skill_gap_for_job":
+            if not data:
+                return "I couldn't analyze the skill gap. Please make sure you have skills in your profile."
+            
+            analysis = data
+            response = f"**Skill Gap Analysis for {analysis.get('job_title', 'this job')}:**\n\n"
+            response += f"Match Percentage: **{analysis.get('match_percentage', 0):.1f}%**\n\n"
+            
+            if analysis.get('matched_skills'):
+                response += f"✅ **Skills You Have:**\n"
+                for skill in analysis['matched_skills'][:10]:
+                    response += f"  • {skill}\n"
+                response += "\n"
+            
+            if analysis.get('missing_skills'):
+                response += f"❌ **Skills You Need:**\n"
+                for skill in analysis['missing_skills'][:10]:
+                    response += f"  • {skill}\n"
+                response += "\n"
+            
+            if analysis.get('recommendations'):
+                response += f"💡 **Recommendations:**\n"
+                for rec in analysis['recommendations'][:5]:
+                    if isinstance(rec, dict):
+                        response += f"  • {rec.get('skill', '')}: {rec.get('reason', '')}\n"
+                    else:
+                        response += f"  • {rec}\n"
+            
+            return response
+        
+        elif intent == "get_my_applications":
+            if not data:
+                return "You haven't applied to any jobs yet. Start by searching for jobs that match your skills!"
+            
+            response = f"**Your Applications ({len(data)}):**\n\n"
+            for app in data:
+                status_emoji = {
+                    "pending": "⏳",
+                    "reviewing": "👀",
+                    "shortlisted": "✅",
+                    "rejected": "❌",
+                    "accepted": "🎉"
+                }.get(app['status'], "📋")
+                
+                response += f"{status_emoji} **{app['job_title']}** at {app['company']}\n"
+                response += f"   Status: {app['status'].capitalize()}\n"
+                if app.get('ats_score') is not None:
+                    passed_emoji = "✅" if app.get('passed') else "❌"
+                    response += f"   ATS Score: {app['ats_score']:.1f}% {passed_emoji}\n"
+                response += "\n"
+            
+            return response
+        
+        elif intent == "get_resume_feedback":
+            if not data:
+                return "I couldn't generate resume feedback. Please provide a job ID or make sure you have a resume uploaded."
+            
+            feedback = data
+            response = "**Resume Feedback & Optimization Tips:**\n\n"
+            
+            if feedback.get('feedback'):
+                response += f"{feedback['feedback']}\n\n"
+            
+            if feedback.get('keyword_suggestions'):
+                response += "**Keywords to Add:**\n"
+                for keyword in feedback['keyword_suggestions'][:10]:
+                    response += f"  • {keyword}\n"
+                response += "\n"
+            
+            if feedback.get('improvements'):
+                response += "**Improvements:**\n"
+                for improvement in feedback['improvements'][:10]:
+                    response += f"  • {improvement}\n"
+            
+            return response
+        
+        elif intent == "interpret_rejection":
+            if not data:
+                return "I couldn't interpret the rejection. Please provide more details about the job and rejection feedback."
+            
+            interpretation = data
+            response = "**Rejection Explanation:**\n\n"
+            response += f"{interpretation.get('student_friendly_explanation', 'No explanation available')}\n\n"
+            
+            if interpretation.get('improvement_suggestions'):
+                response += "**How to Improve:**\n"
+                for suggestion in interpretation['improvement_suggestions'][:5]:
+                    response += f"  • {suggestion}\n"
+                response += "\n"
+            
+            if interpretation.get('motivational_message'):
+                response += f"💪 **{interpretation['motivational_message']}**\n"
+            
+            return response
+        
+        elif intent == "help":
+            return """I'm your AI career assistant! I can help you with:
+
+• **Job Search**: "Find backend developer jobs", "Show me Python positions", "Search for remote jobs"
+• **Skill Analysis**: "What skills do I need for job 5?", "Analyze my skills for this job"
+• **Applications**: "Show my applications", "Where did I apply?", "Application status"
+• **Resume Help**: "How can I improve my resume?", "Resume feedback for job 3"
+• **Rejections**: "Why was I rejected from job 2?", "Explain this rejection"
+
+Just ask me in natural language and I'll help you find opportunities and improve your profile!"""
+        
+        else:
+            return "I'm not sure how to help with that. Try asking about job search, skill gaps, applications, or resume feedback."
+
+
 class ChatOrchestrator:
     """Main orchestrator that coordinates intent classification, data retrieval, and response generation"""
     
@@ -734,4 +1165,144 @@ class ChatOrchestrator:
         response = self.response_generator.generate(intent, data, params)
         
         # Return response and data (for frontend to render structured views if needed)
+        return response, data
+
+
+class StudentChatOrchestrator:
+    """Main orchestrator for student chat that coordinates intent classification, data retrieval, and response generation"""
+    
+    def __init__(self, db: Session, user_id: int):
+        self.db = db
+        self.intent_classifier = StudentIntentClassifier()
+        self.data_retriever = DataRetriever(db)
+        self.response_generator = StudentResponseGenerator()
+        self.user_id = user_id
+        self.student_engine = CampusConnectStudentEngine()
+    
+    def get_student_skills(self) -> List[str]:
+        """Get student's skills from their profile"""
+        profile = self.data_retriever.get_student_profile(self.user_id)
+        return profile.get('skills', []) if profile else []
+    
+    def process_message(self, message: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+        """
+        Process a student message and return response with optional data
+        
+        Returns:
+            Tuple of (response_text, data_dict)
+        """
+        # Get student skills
+        student_skills = self.get_student_skills()
+        
+        # Classify intent
+        intent, params = self.intent_classifier.classify(message)
+        
+        # Retrieve data based on intent
+        data = None
+        if intent == "search_jobs":
+            query = params.get("query", message)
+            data = self.data_retriever.search_jobs_for_student(query, student_skills, top_k=10)
+        elif intent == "get_job_details":
+            data = self.data_retriever.get_job_details_for_student(
+                params.get("job_id"), student_skills
+            )
+        elif intent == "analyze_skill_gap_for_job":
+            data = self.data_retriever.analyze_skill_gap_for_job(
+                params.get("job_id"), student_skills
+            )
+        elif intent == "analyze_skill_gap":
+            # Need job_id from params or ask user
+            if params.get("job_id"):
+                data = self.data_retriever.analyze_skill_gap_for_job(
+                    params.get("job_id"), student_skills
+                )
+            else:
+                return "Please specify which job you'd like me to analyze. For example: 'What skills do I need for job 5?'", None
+        elif intent == "get_my_applications":
+            data = self.data_retriever.get_student_applications(self.user_id)
+        elif intent == "get_resume_feedback":
+            job_id = params.get("job_id")
+            if job_id:
+                # Get job details
+                job = self.db.query(Job).filter(Job.id == job_id).first()
+                if job:
+                    # Get student resume
+                    profile = self.data_retriever.get_student_profile(self.user_id)
+                    resume_id = profile.get('resume_id') if profile else None
+                    
+                    if resume_id:
+                        from database.mongodb import get_mongo_db
+                        mongo_db = get_mongo_db()
+                        resume_doc = mongo_db.resumes.find_one({"resume_id": resume_id})
+                        
+                        if resume_doc:
+                            resume_text = resume_doc.get("raw_text", "")
+                            requirements = job.requirements_json or {}
+                            
+                            # Analyze skill gap first
+                            skill_gap = self.data_retriever.analyze_skill_gap_for_job(job_id, student_skills)
+                            
+                            # Get resume feedback
+                            feedback = self.student_engine.get_resume_feedback(
+                                resume_text=resume_text,
+                                job_description=job.description or "",
+                                job_requirements=str(requirements),
+                                skill_gap_output=skill_gap or {}
+                            )
+                            data = feedback
+                    else:
+                        return "You need to upload a resume first to get feedback. Please upload your resume in your profile.", None
+                else:
+                    return f"Job {job_id} not found.", None
+            else:
+                return "Please specify which job you'd like resume feedback for. For example: 'Resume feedback for job 5'", None
+        elif intent == "interpret_rejection":
+            job_id = params.get("job_id")
+            if job_id:
+                # Get application for this job
+                candidate = self.db.query(Candidate).filter(Candidate.user_id == self.user_id).first()
+                if candidate:
+                    application = self.db.query(Application).filter(
+                        and_(
+                            Application.candidate_id == candidate.id,
+                            Application.job_id == job_id
+                        )
+                    ).first()
+                    
+                    if application and application.status == ApplicationStatus.REJECTED:
+                        # Get evaluation feedback
+                        evaluation = self.db.query(Evaluation).filter(
+                            Evaluation.application_id == application.id
+                        ).first()
+                        
+                        if evaluation and evaluation.feedback_id:
+                            from database.mongodb import get_mongo_db
+                            mongo_db = get_mongo_db()
+                            feedback_doc = mongo_db.feedback.find_one({"feedback_id": evaluation.feedback_id})
+                            
+                            if feedback_doc:
+                                rejection_reasons = feedback_doc.get("rejection_reasons", [])
+                                rejection_text = ". ".join(rejection_reasons) if rejection_reasons else "No specific feedback available."
+                                
+                                job = self.db.query(Job).filter(Job.id == job_id).first()
+                                
+                                interpretation = self.student_engine.interpret_rejection(
+                                    rejection_feedback=rejection_text,
+                                    job_title=job.title if job else "Unknown",
+                                    student_skills=student_skills
+                                )
+                                data = interpretation
+                        else:
+                            return "I couldn't find detailed rejection feedback for this application. The rejection may not have been processed yet.", None
+                    else:
+                        return f"You haven't been rejected from job {job_id}, or the application doesn't exist.", None
+                else:
+                    return "Could not find your candidate profile.", None
+            else:
+                return "Please specify which job rejection you'd like me to explain. For example: 'Why was I rejected from job 3?'", None
+        
+        # Generate response
+        response = self.response_generator.generate(intent, data, params, student_skills)
+        
+        # Return response and data
         return response, data

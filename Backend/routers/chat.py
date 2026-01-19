@@ -1,11 +1,11 @@
-"""Chat router for HR AI assistant"""
+"""Chat router for HR AI assistant and Student AI assistant"""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database.postgres import get_db
 from database.models import User
 from database.schemas import ChatMessageRequest, ChatMessageResponse
-from chat_engine import ChatOrchestrator
+from chat_engine import ChatOrchestrator, StudentChatOrchestrator
 from auth.dependencies import get_current_active_user
 
 router = APIRouter(prefix="/api/v1/chat", tags=["Chat"])
@@ -20,27 +20,41 @@ async def chat_message(
     """
     Process a chat message and return AI response
     
-    Only accessible to recruiters and admins
+    Accessible to recruiters, admins, and students
     """
-    # Only recruiters and admins can use chat
-    if current_user.role.value not in ["recruiter", "admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only recruiters and admins can use the chat feature"
-        )
-    
     try:
-        # Initialize chat orchestrator
-        orchestrator = ChatOrchestrator(db)
-        
-        # Process message
-        response_text, data = orchestrator.process_message(request.message)
-        
-        return ChatMessageResponse(
-            response=response_text,
-            data=data,
-            conversation_id=request.conversation_id
-        )
+        # Route based on user role
+        if current_user.role.value == "student":
+            # Initialize student chat orchestrator
+            orchestrator = StudentChatOrchestrator(db, current_user.id)
+            
+            # Process message
+            response_text, data = orchestrator.process_message(request.message)
+            
+            return ChatMessageResponse(
+                response=response_text,
+                data=data,
+                conversation_id=request.conversation_id
+            )
+        elif current_user.role.value in ["recruiter", "admin"]:
+            # Initialize HR chat orchestrator
+            orchestrator = ChatOrchestrator(db)
+            
+            # Process message
+            response_text, data = orchestrator.process_message(request.message)
+            
+            return ChatMessageResponse(
+                response=response_text,
+                data=data,
+                conversation_id=request.conversation_id
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chat feature is only available for students, recruiters, and admins"
+            )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

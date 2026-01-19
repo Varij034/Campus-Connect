@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   GraduationCap, 
@@ -17,6 +17,7 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NavbarProps {
   role: 'student' | 'hr';
@@ -24,7 +25,14 @@ interface NavbarProps {
 
 export default function Navbar({ role }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { isCollapsed, toggleSidebar } = useSidebar();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
+  };
   
   const studentLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -109,6 +117,7 @@ export default function Navbar({ role }: NavbarProps) {
 
       <div className="mt-auto pt-8 px-2">
         <button 
+          onClick={handleLogout}
           className={`flex items-center ${
             isCollapsed ? 'justify-center px-2' : 'gap-3 px-4'
           } py-3 rounded-lg text-base-content hover:bg-base-300 w-full transition-colors`}

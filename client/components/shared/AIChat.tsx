@@ -66,28 +66,17 @@ export default function AIChat({ role }: AIChatProps) {
     setIsLoading(true);
 
     try {
-      // Only use chat API for HR role
-      if (role === 'hr') {
-        const response = await chatApi.sendMessage(userInput);
-        
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: response.response,
-          timestamp: new Date(),
-        };
-        
-        setMessages((prev) => [...prev, assistantMessage]);
-      } else {
-        // For student role, keep the mock response for now
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: "I understand you're looking for opportunities. Let me search our database for positions that match your profile. Based on your skills, I've found several relevant positions. Would you like me to show you the details?",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-      }
+      // Use chat API for both HR and student roles
+      const response = await chatApi.sendMessage(userInput);
+      
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response.response,
+        timestamp: new Date(),
+      };
+      
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),

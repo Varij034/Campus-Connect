@@ -55,6 +55,30 @@ class StudentJobMatchingEngine:
         if not jobs:
             return []
         
+        # Extract specific skills/technologies mentioned in the query
+        query_skills = self._extract_skills_from_query(student_query)
+        
+        # Filter jobs to only include those that mention the required skills
+        if query_skills:
+            filtered_jobs = []
+            query_skills_lower = [skill.lower() for skill in query_skills]
+            for job in jobs:
+                job_text = f"{job.get('title', '')} {job.get('description', '')} {job.get('requirements', '')}".lower()
+                # Check if job contains any of the required skills (using word boundaries for exact matches)
+                job_contains_skill = False
+                for skill_lower in query_skills_lower:
+                    # Use word boundaries to avoid partial matches (e.g., "javascript" matching "java")
+                    pattern = r'\b' + re.escape(skill_lower) + r'\b'
+                    if re.search(pattern, job_text):
+                        job_contains_skill = True
+                        break
+                if job_contains_skill:
+                    filtered_jobs.append(job)
+            jobs = filtered_jobs
+        
+        if not jobs:
+            return []
+        
         # Encode student query for semantic search
         query_embedding = self.model.encode(student_query, normalize_embeddings=True)
         
@@ -104,6 +128,39 @@ class StudentJobMatchingEngine:
             results.append(result)
         
         return results
+    
+    def _extract_skills_from_query(self, query: str) -> List[str]:
+        """
+        Extract specific skills/technologies mentioned in the user's query.
+        This helps filter jobs to only show those that actually require the mentioned skills.
+        """
+        if not query:
+            return []
+        
+        # Common tech skills to look for in queries
+        skill_keywords = [
+            'Python', 'Java', 'JavaScript', 'TypeScript', 'C++', 'C#', 'Go', 'Rust',
+            'React', 'Angular', 'Vue', 'Node.js', 'Django', 'Flask', 'Spring Boot',
+            'SQL', 'PostgreSQL', 'MySQL', 'MongoDB', 'Redis',
+            'Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP',
+            'REST API', 'GraphQL', 'Microservices',
+            'TensorFlow', 'PyTorch', 'Machine Learning', 'Deep Learning',
+            'Git', 'CI/CD', 'Linux', 'DevOps',
+            'Pandas', 'NumPy', 'Data Analysis', 'Excel',
+            'Backend', 'Frontend', 'Full Stack', 'Full-Stack'
+        ]
+        
+        found_skills = []
+        query_lower = query.lower()
+        
+        # Check for each skill keyword
+        for skill in skill_keywords:
+            # Use word boundaries to avoid partial matches
+            pattern = r'\b' + re.escape(skill.lower()) + r'\b'
+            if re.search(pattern, query_lower):
+                found_skills.append(skill)
+        
+        return found_skills
     
     def _extract_skills(self, requirements_text: str) -> List[str]:
         """
