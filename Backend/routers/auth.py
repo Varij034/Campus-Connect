@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from database.postgres import get_db
 from database.models import User, UserRole
-from database.schemas import UserCreate, UserResponse, Token
+from database.schemas import UserCreate, UserResponse, Token, UserRole as SchemaUserRole
 from auth.password import verify_password, get_password_hash
 from auth.jwt_handler import create_access_token
 from auth.dependencies import get_current_active_user
@@ -26,19 +26,25 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    # Create new user
+    # Create new user (use model's UserRole for DB enum column)
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
         email=user_data.email,
         password_hash=hashed_password,
-        role=user_data.role
+        role=UserRole(user_data.role.value),
     )
     
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     
-    return new_user
+    # Build response with schema enum so Pydantic validation succeeds (ORM role is models.UserRole)
+    return UserResponse(
+        id=new_user.id,
+        email=new_user.email,
+        role=SchemaUserRole(new_user.role.value),
+        created_at=new_user.created_at,
+    )
 
 
 @router.post("/login", response_model=Token)
@@ -70,7 +76,12 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get current user information"""
-    return current_user
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        role=SchemaUserRole(current_user.role.value),
+        created_at=current_user.created_at,
+    )
 
 
 @router.post("/refresh", response_model=Token)

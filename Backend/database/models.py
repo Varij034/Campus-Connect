@@ -39,7 +39,12 @@ class User(Base):
 
     # Relationships
     jobs = relationship("Job", back_populates="creator")
-    candidate = relationship("Candidate", back_populates="user", uselist=False)
+    candidate = relationship(
+        "Candidate",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="[Candidate.user_id]",
+    )
 
 
 class Job(Base):
@@ -80,7 +85,7 @@ class Candidate(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", back_populates="candidate")
+    user = relationship("User", back_populates="candidate", foreign_keys=[user_id])
     applications = relationship("Application", back_populates="candidate")
     candidate_badges = relationship("CandidateBadge", back_populates="candidate")
     test_attempts = relationship("TestAttempt", back_populates="candidate")
