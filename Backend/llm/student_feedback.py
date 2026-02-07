@@ -22,7 +22,7 @@ def _build_resume_feedback_prompt(
         "- risk_level: one of ['low', 'medium', 'high'] describing current fit.\n\n"
         f"Job description:\n{job_description}\n\n"
         f"Job requirements text:\n{job_requirements}\n\n"
-        f\"\"\"Skill gap analysis (JSON):\n{skill_gap_output}\n\"\"\"\n\n"
+        f'"""Skill gap analysis (JSON):\n{skill_gap_output}\n"""\n\n'
         f"Student resume:\n{resume_text[:6000]}\n"
     )
 
