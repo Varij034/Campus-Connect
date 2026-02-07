@@ -126,10 +126,14 @@ async def evaluate_candidate(
 async def list_candidates(
     skip: int = 0,
     limit: int = 100,
+    passed: Optional[bool] = None,
+    job_id: Optional[int] = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """List all candidates and automatically create evaluations for applications"""
+    """List all candidates and automatically create evaluations for applications.
+    Optional: passed=true to only return candidates with at least one passing evaluation;
+    job_id to scope to applications for that job."""
     # Only recruiters and admins can list candidates
     if current_user.role.value not in ["recruiter", "admin"]:
         raise HTTPException(
@@ -137,31 +141,42 @@ async def list_candidates(
             detail="Only recruiters and admins can list candidates"
         )
     
-    candidates = db.query(Candidate).offset(skip).limit(limit).all()
+    query = db.query(Candidate)
+    
+    if passed is True or job_id is not None:
+        # Subquery: candidate_ids that have an application (optionally for job_id) with a passing evaluation
+        subq = (
+            db.query(Application.candidate_id)
+            .join(Evaluation, Evaluation.application_id == Application.id)
+        )
+        if job_id is not None:
+            subq = subq.filter(Application.job_id == job_id)
+        if passed is True:
+            subq = subq.filter(Evaluation.passed == True)
+        subq = subq.distinct()
+        candidate_ids = [row[0] for row in subq.all()]
+        if not candidate_ids:
+            return []
+        query = query.filter(Candidate.id.in_(candidate_ids))
+    
+    candidates = query.offset(skip).limit(limit).all()
     
     # Automatically create evaluations for all applications that don't have evaluations
-    # Import here to avoid circular imports
     from routers.ats import create_evaluation_for_application
     
     for candidate in candidates:
-        if candidate.resume_id:  # Only process candidates with resumes
-            # Get all applications for this candidate
+        if candidate.resume_id:
             applications = db.query(Application).filter(
                 Application.candidate_id == candidate.id
             ).all()
-            
             for application in applications:
-                # Check if evaluation already exists
                 existing_eval = db.query(Evaluation).filter(
                     Evaluation.application_id == application.id
                 ).first()
-                
                 if not existing_eval:
-                    # Automatically create evaluation
                     try:
                         create_evaluation_for_application(application, db)
                     except Exception:
-                        # Silently fail if evaluation creation fails (e.g., missing resume/job requirements)
                         pass
     
     return candidates

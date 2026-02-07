@@ -1,6 +1,7 @@
 """Job authoring helper endpoints powered by LLM."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth.dependencies import get_current_active_user
@@ -87,9 +88,13 @@ async def rewrite_description(
     return {"description": result.get("description", "")}
 
 
+class ExtractRequirementsBody(BaseModel):
+    description: str
+
+
 @router.post("/extract-requirements")
 async def extract_requirements(
-    description: str,
+    body: ExtractRequirementsBody,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -99,6 +104,7 @@ async def extract_requirements(
     Shape is aligned with existing Job.requirements_json usage.
     """
     _require_recruiter_or_admin(current_user)
+    description = body.description
 
     client = get_groq_client()
     system_prompt = (

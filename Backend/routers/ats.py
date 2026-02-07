@@ -213,7 +213,18 @@ def create_evaluation_for_application(application: Application, db: Session) -> 
         db.add(evaluation)
         db.commit()
         db.refresh(evaluation)
-        
+        if evaluation.passed:
+            from routers.badges import try_award_badges_for_passed_evaluation
+            try_award_badges_for_passed_evaluation(
+                db,
+                application.candidate_id,
+                ats_result.get("matched_skills") or [],
+                ats_result.get("skill_match_score") or 0,
+            )
+        from routers.notifications import notify_user
+        candidate = application.candidate
+        if candidate:
+            notify_user(candidate.user_id, {"type": "evaluation_ready", "application_id": application.id})
         return evaluation
     except Exception as e:
         db.rollback()
@@ -341,7 +352,16 @@ async def create_evaluation(
         db.add(evaluation)
         db.commit()
         db.refresh(evaluation)
-        
+        if evaluation.passed:
+            from routers.badges import try_award_badges_for_passed_evaluation
+            try_award_badges_for_passed_evaluation(
+                db,
+                candidate.id,
+                ats_result.get("matched_skills") or [],
+                ats_result.get("skill_match_score") or 0,
+            )
+        from routers.notifications import notify_user
+        notify_user(candidate.user_id, {"type": "evaluation_ready", "application_id": application.id})
         return evaluation
         
     except HTTPException:

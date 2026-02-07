@@ -1,4 +1,4 @@
-import { Token, User, ApiError, Job, JobCreate, JobSearchResponse, ATSScoreRequest, ATSScoreResponse, EvaluationResponse, BatchScoreRequest, BatchScoreResponse, Candidate, ChatMessageRequest, ChatMessageResponse, StudentApplication } from '@/types/api';
+import { Token, User, ApiError, Job, JobCreate, JobSearchResponse, ATSScoreRequest, ATSScoreResponse, EvaluationResponse, BatchScoreRequest, BatchScoreResponse, Candidate, ChatMessageRequest, ChatMessageResponse, StudentApplication, Badge, CandidateBadge, PrepModule, MentorProfile, MentorshipRequest, Event, EventRegistration, Conversation, Message } from '@/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -135,7 +135,7 @@ export const authApi = {
     return response.json();
   },
 
-  register: async (email: string, password: string, role: 'student' | 'recruiter'): Promise<User> => {
+  register: async (email: string, password: string, role: 'student' | 'recruiter' | 'tpo'): Promise<User> => {
     return apiRequest<User>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, role }),
@@ -191,6 +191,32 @@ export const jobsApi = {
   },
 };
 
+// Aptitude API
+export const aptitudeApi = {
+  listTests: async (): Promise<{ id: number; title: string; description?: string; duration_minutes: number; question_count: number }[]> =>
+    apiRequest('/api/v1/aptitude/tests'),
+  getTest: async (testId: number): Promise<{ id: number; title: string; description?: string; duration_minutes: number; question_count: number }> =>
+    apiRequest(`/api/v1/aptitude/tests/${testId}`),
+  startAttempt: async (testId: number): Promise<{
+    attempt_id: number;
+    test_id: number;
+    questions: { id: number; question_text: string; options: string[]; category?: string; difficulty?: string }[];
+    duration_minutes: number;
+  }> => apiRequest(`/api/v1/aptitude/tests/${testId}/start`, { method: 'POST' }),
+  submitAttempt: async (attemptId: number, answers: Record<string, number>): Promise<{
+    attempt_id: number;
+    score: number;
+    passed: boolean;
+    total_questions: number;
+    correct_count: number;
+  }> => apiRequest(`/api/v1/aptitude/attempts/${attemptId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ answers }),
+  }),
+  myAttempts: async (): Promise<{ id: number; test_id: number; test_title?: string; started_at?: string; submitted_at?: string; score?: number; passed?: boolean }[]> =>
+    apiRequest('/api/v1/aptitude/attempts/me'),
+};
+
 // Student API
 export const studentApi = {
   searchJobs: async (query: string, studentSkills: string[], topK = 10): Promise<JobSearchResponse[]> => {
@@ -237,14 +263,32 @@ export const atsApi = {
   },
 };
 
+// HR Stats API
+export const hrApi = {
+  getStats: async (): Promise<{
+    total_jobs: number;
+    total_applications: number;
+    shortlisted: number;
+    avg_ats_score: number;
+  }> => {
+    return apiRequest('/api/v1/hr/stats');
+  },
+};
+
 // Candidates API
 export const candidatesApi = {
-  list: async (skip = 0, limit = 100): Promise<Candidate[]> => {
+  list: async (
+    skip = 0,
+    limit = 100,
+    passed?: boolean,
+    jobId?: number
+  ): Promise<Candidate[]> => {
     const params = new URLSearchParams({
       skip: skip.toString(),
       limit: limit.toString(),
     });
-    
+    if (passed === true) params.append('passed', 'true');
+    if (jobId != null) params.append('job_id', jobId.toString());
     return apiRequest<Candidate[]>(`/api/v1/candidates?${params.toString()}`);
   },
 
@@ -294,6 +338,155 @@ export const resumeApi = {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  },
+};
+
+// Badges API
+export const badgesApi = {
+  list: async (): Promise<Badge[]> => apiRequest<Badge[]>('/api/v1/badges'),
+  getMyBadges: async (): Promise<CandidateBadge[]> => apiRequest<CandidateBadge[]>('/api/v1/badges/me'),
+  getCandidateBadges: async (candidateId: number): Promise<CandidateBadge[]> =>
+    apiRequest<CandidateBadge[]>(`/api/v1/badges/candidates/${candidateId}`),
+  award: async (candidateId: number, badgeId: number, source = 'tpo'): Promise<CandidateBadge> =>
+    apiRequest<CandidateBadge>('/api/v1/badges/award', {
+      method: 'POST',
+      body: JSON.stringify({ candidate_id: candidateId, badge_id: badgeId, source }),
+    }),
+};
+
+// TPO API
+export const tpoApi = {
+  listPendingVerification: async (skip = 0, limit = 100): Promise<Candidate[]> => {
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString(),
+    });
+    return apiRequest<Candidate[]>(`/api/v1/tpo/candidates/pending-verification?${params.toString()}`);
+  },
+
+  verifyCandidate: async (candidateId: number): Promise<Candidate> => {
+    return apiRequest<Candidate>(`/api/v1/tpo/candidates/${candidateId}/verify`, {
+      method: 'POST',
+    });
+  },
+
+  getStats: async (): Promise<{
+    total_candidates: number;
+    verified_count: number;
+    total_applications: number;
+    placements: number;
+    active_jobs: number;
+  }> => {
+    return apiRequest('/api/v1/tpo/stats');
+  },
+};
+
+// Prep API (company/JD-specific prep)
+export const prepApi = {
+  list: async (company?: string, jobId?: number): Promise<PrepModule[]> => {
+    const params = new URLSearchParams();
+    if (company) params.append('company', company);
+    if (jobId != null) params.append('job_id', jobId.toString());
+    return apiRequest<PrepModule[]>(`/api/v1/prep/modules?${params.toString()}`);
+  },
+  get: async (id: number): Promise<PrepModule> =>
+    apiRequest<PrepModule>(`/api/v1/prep/modules/${id}`),
+  forJob: async (jobId: number): Promise<PrepModule[]> =>
+    apiRequest<PrepModule[]>(`/api/v1/prep/for-job/${jobId}`),
+};
+
+export const mentorshipApi = {
+  listMentors: async (params?: { skill?: string; company?: string; is_available?: boolean }): Promise<MentorProfile[]> => {
+    const search = new URLSearchParams();
+    if (params?.skill) search.append('skill', params.skill);
+    if (params?.company) search.append('company', params.company);
+    if (params?.is_available != null) search.append('is_available', String(params.is_available));
+    return apiRequest<MentorProfile[]>(`/api/v1/mentors?${search.toString()}`);
+  },
+  getMentor: async (mentorId: number): Promise<MentorProfile> =>
+    apiRequest<MentorProfile>(`/api/v1/mentors/${mentorId}`),
+  createRequest: async (mentorId: number, message?: string): Promise<MentorshipRequest> =>
+    apiRequest<MentorshipRequest>('/api/v1/mentorship/requests', {
+      method: 'POST',
+      body: JSON.stringify({ mentor_id: mentorId, message: message || null }),
+    }),
+  listMyRequests: async (): Promise<MentorshipRequest[]> =>
+    apiRequest<MentorshipRequest[]>('/api/v1/mentorship/requests/me'),
+  respondRequest: async (requestId: number, status: 'accepted' | 'declined'): Promise<MentorshipRequest> =>
+    apiRequest<MentorshipRequest>(`/api/v1/mentorship/requests/${requestId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+};
+
+export const eventsApi = {
+  list: async (params?: { type?: string; is_active?: boolean }): Promise<Event[]> => {
+    const search = new URLSearchParams();
+    if (params?.type) search.append('type', params.type);
+    if (params?.is_active != null) search.append('is_active', String(params.is_active));
+    return apiRequest<Event[]>(`/api/v1/events?${search.toString()}`);
+  },
+  get: async (eventId: number): Promise<Event> =>
+    apiRequest<Event>(`/api/v1/events/${eventId}`),
+  register: async (eventId: number): Promise<EventRegistration> =>
+    apiRequest<EventRegistration>(`/api/v1/events/${eventId}/register`, { method: 'POST' }),
+  myRegistrations: async (): Promise<EventRegistration[]> =>
+    apiRequest<EventRegistration[]>('/api/v1/events/registrations/me'),
+};
+
+export const messagesApi = {
+  listConversations: async (): Promise<Conversation[]> =>
+    apiRequest<Conversation[]>('/api/v1/conversations'),
+  getMessages: async (conversationId: number, limit?: number, offset?: number): Promise<Message[]> => {
+    const params = new URLSearchParams();
+    if (limit != null) params.append('limit', String(limit));
+    if (offset != null) params.append('offset', String(offset));
+    return apiRequest<Message[]>(`/api/v1/conversations/${conversationId}/messages?${params.toString()}`);
+  },
+  createConversation: async (body: { job_id?: number; candidate_id?: number; initial_message?: string }): Promise<Conversation> =>
+    apiRequest<Conversation>('/api/v1/conversations', { method: 'POST', body: JSON.stringify(body) }),
+  sendMessage: async (conversationId: number, body: string): Promise<Message> =>
+    apiRequest<Message>(`/api/v1/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+};
+
+// Job LLM API (JD Analyzer)
+export const jobLlmApi = {
+  extractRequirements: async (description: string): Promise<{
+    job_title: string;
+    required_skills: string[];
+    preferred_skills: string[];
+    education_level: string;
+    years_of_experience: number;
+    job_description: string;
+  }> => {
+    return apiRequest('/api/v1/llm/jobs/extract-requirements', {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    });
+  },
+};
+
+// Recruiter LLM API (Matchmaker - resume summary per candidate/job)
+export const recruiterLlmApi = {
+  resumeSummary: async (
+    candidateId: number,
+    jobId?: number
+  ): Promise<{
+    candidate_id: number;
+    job_id: number | null;
+    headline: string;
+    summary_bullets: string[];
+    risks: string[];
+    overall_fit: string;
+  }> => {
+    const params = new URLSearchParams({ candidate_id: candidateId.toString() });
+    if (jobId != null) params.append('job_id', jobId.toString());
+    return apiRequest(`/api/v1/llm/recruiter/resume-summary?${params.toString()}`, {
+      method: 'POST',
+    });
   },
 };
 

@@ -4,13 +4,14 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { GraduationCap, Building2, Mail, Lock, User, Phone } from 'lucide-react';
+import { GraduationCap, Building2, Mail, Lock, User, Phone, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { handleApiError } from '@/lib/errors';
 import { UserRole } from '@/types/api';
+import { authApi } from '@/lib/api';
 
 export default function RegisterPage() {
-  const [role, setRole] = useState<'student' | 'hr'>('student');
+  const [role, setRole] = useState<'student' | 'hr' | 'tpo'>('student');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -58,19 +59,16 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await register(formData.email, formData.password, role);
-      // Auto-login will redirect, but we can also redirect here
-      if (user) {
-        if (user.role === UserRole.STUDENT) {
-          router.push('/student/dashboard');
-        } else if (user.role === UserRole.RECRUITER) {
-          router.push('/hr/dashboard');
-        } else {
-          router.push('/student/dashboard');
-        }
+      // Auto-login done inside register; get current user and redirect
+      const userInfo = await authApi.getMe();
+      if (userInfo.role === UserRole.STUDENT) {
+        router.push('/student/dashboard');
+      } else if (userInfo.role === UserRole.RECRUITER) {
+        router.push('/hr/dashboard');
+      } else if (userInfo.role === UserRole.TPO) {
+        router.push('/tpo/dashboard');
       } else {
-        setTimeout(() => {
-          router.push('/student/dashboard');
-        }, 100);
+        router.push('/student/dashboard');
       }
     } catch (error) {
       const errorMessage = handleApiError(error);
@@ -112,10 +110,11 @@ export default function RegisterPage() {
           </div>
 
           {/* Role Selection */}
-          <div className="flex gap-2 mb-6">
+          <div className="flex flex-wrap gap-2 mb-6">
             <button
+              type="button"
               onClick={() => setRole('student')}
-              className={`flex-1 btn ${
+              className={`flex-1 min-w-[80px] btn ${
                 role === 'student' ? 'btn-primary' : 'btn-outline'
               }`}
             >
@@ -123,13 +122,24 @@ export default function RegisterPage() {
               Student
             </button>
             <button
+              type="button"
               onClick={() => setRole('hr')}
-              className={`flex-1 btn ${
+              className={`flex-1 min-w-[80px] btn ${
                 role === 'hr' ? 'btn-secondary' : 'btn-outline'
               }`}
             >
               <Building2 className="w-5 h-5 mr-2" />
               HR
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('tpo')}
+              className={`flex-1 min-w-[80px] btn ${
+                role === 'tpo' ? 'btn-accent' : 'btn-outline'
+              }`}
+            >
+              <ShieldCheck className="w-5 h-5 mr-2" />
+              TPO
             </button>
           </div>
 
@@ -143,10 +153,10 @@ export default function RegisterPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            {role === 'hr' && (
+            {(role === 'hr' || role === 'tpo') && (
               <div>
                 <label className="label">
-                  <span className="label-text">Company Name</span>
+                  <span className="label-text">{role === 'tpo' ? 'Institution' : 'Company Name'}</span>
                 </label>
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/50" />
@@ -154,7 +164,7 @@ export default function RegisterPage() {
                     type="text"
                     value={formData.company}
                     onChange={(e) => handleChange('company', e.target.value)}
-                    placeholder="Company Inc."
+                    placeholder={role === 'tpo' ? 'Your College / University' : 'Company Inc.'}
                     className={`input input-bordered w-full pl-10 ${
                       errors.company ? 'input-error' : ''
                     }`}

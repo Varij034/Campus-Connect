@@ -11,6 +11,8 @@ class UserRole(str, Enum):
     STUDENT = "student"
     RECRUITER = "recruiter"
     ADMIN = "admin"
+    TPO = "tpo"
+    MENTOR = "mentor"
 
 
 class UserCreate(BaseModel):
@@ -97,6 +99,9 @@ class CandidateResponse(BaseModel):
     phone: Optional[str]
     skills_json: Optional[List[str]]
     resume_id: Optional[str]
+    is_verified: bool = False
+    verified_at: Optional[datetime] = None
+    verified_by: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -274,6 +279,134 @@ class RejectionInterpretResponse(BaseModel):
     motivational_message: str
     next_steps: List[str]
     raw_feedback: str
+
+
+# Mentorship Schemas
+class MentorProfileResponse(BaseModel):
+    id: int
+    user_id: int
+    headline: Optional[str] = None
+    bio: Optional[str] = None
+    skills_json: Optional[List[str]] = None
+    company: Optional[str] = None
+    years_experience: Optional[int] = None
+    linkedin_url: Optional[str] = None
+    is_available: bool = True
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MentorProfileCreate(BaseModel):
+    headline: Optional[str] = None
+    bio: Optional[str] = None
+    skills_json: Optional[List[str]] = None
+    company: Optional[str] = None
+    years_experience: Optional[int] = None
+    linkedin_url: Optional[str] = None
+    is_available: bool = True
+
+
+class MentorshipRequestCreate(BaseModel):
+    mentor_id: int
+    message: Optional[str] = None
+
+
+class MentorshipRequestUpdate(BaseModel):
+    status: str  # accepted, declined
+
+
+class MentorshipRequestResponse(BaseModel):
+    id: int
+    mentor_id: int
+    student_id: int
+    message: Optional[str] = None
+    status: str
+    created_at: datetime
+    responded_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Event Schemas
+class EventResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    type: str
+    start_date: datetime
+    end_date: datetime
+    location: Optional[str] = None
+    registration_deadline: Optional[datetime] = None
+    max_participants: Optional[int] = None
+    is_active: bool = True
+    created_by: Optional[int] = None
+    created_at: datetime
+    registration_count: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
+class EventCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    type: str  # hackathon, startup, workshop
+    start_date: datetime
+    end_date: datetime
+    location: Optional[str] = None
+    registration_deadline: Optional[datetime] = None
+    max_participants: Optional[int] = None
+    is_active: bool = True
+
+
+class EventRegistrationResponse(BaseModel):
+    id: int
+    event_id: int
+    candidate_id: int
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Messaging Schemas
+class ConversationResponse(BaseModel):
+    id: int
+    job_id: Optional[int] = None
+    company_user_id: int
+    candidate_id: int
+    created_at: datetime
+    job_title: Optional[str] = None
+    candidate_name: Optional[str] = None
+    last_message_preview: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MessageResponse(BaseModel):
+    id: int
+    conversation_id: int
+    sender_id: int
+    body: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationCreate(BaseModel):
+    job_id: Optional[int] = None
+    candidate_id: Optional[int] = None  # for recruiter starting with candidate
+    initial_message: Optional[str] = None
+
+
+class MessageCreate(BaseModel):
+    body: str
 
 
 # Chat Schemas

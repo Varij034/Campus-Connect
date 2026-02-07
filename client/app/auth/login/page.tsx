@@ -8,6 +8,7 @@ import { GraduationCap, Building2, Mail, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { handleApiError } from '@/lib/errors';
 import { UserRole } from '@/types/api';
+import { authApi } from '@/lib/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -44,20 +45,16 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(email, password);
-      // Redirect based on user role
-      if (user) {
-        if (user.role === UserRole.STUDENT) {
-          router.push('/student/dashboard');
-        } else if (user.role === UserRole.RECRUITER) {
-          router.push('/hr/dashboard');
-        } else {
-          router.push('/student/dashboard');
-        }
+      // Redirect based on user role (fetch current user after login for correct redirect)
+      const userInfo = await authApi.getMe();
+      if (userInfo.role === UserRole.STUDENT) {
+        router.push('/student/dashboard');
+      } else if (userInfo.role === UserRole.RECRUITER) {
+        router.push('/hr/dashboard');
+      } else if (userInfo.role === UserRole.TPO) {
+        router.push('/tpo/dashboard');
       } else {
-        // Wait a bit for user to be set, then redirect
-        setTimeout(() => {
-          router.push('/student/dashboard');
-        }, 100);
+        router.push('/student/dashboard');
       }
     } catch (error) {
       const errorMessage = handleApiError(error);

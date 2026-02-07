@@ -6,6 +6,7 @@ import { FileText, Calendar, CheckCircle, Clock, XCircle } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { studentApi } from '@/lib/api';
 import { StudentApplication, ApplicationStatus } from '@/types/api';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface Application {
   id: number;
@@ -65,6 +66,10 @@ export default function ApplicationsPage() {
   useEffect(() => {
     fetchApplications();
   }, []);
+
+  useNotifications((event) => {
+    if (event.type === 'evaluation_ready') fetchApplications();
+  });
 
   const getStatusBadge = (status: Application['status']) => {
     const badges = {

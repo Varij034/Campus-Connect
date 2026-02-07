@@ -9,17 +9,19 @@ import {
   CheckCircle,
   Clock,
   DollarSign,
+  FileText,
   Globe,
   MapPin,
   Target,
   TrendingUp,
   Users,
-  Video
+  Video,
+  Mail
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import SkillGapCard from '@/components/student/SkillGapCard';
-import { jobsApi } from '@/lib/api';
+import { jobsApi, messagesApi } from '@/lib/api';
 import { Job } from '@/types/api';
 import { handleApiError } from '@/lib/errors';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -33,6 +35,7 @@ export default function JobDetailsPage() {
   const [isApplied, setIsApplied] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [contacting, setContacting] = useState(false);
 
   const jobId = params?.id as string;
 
@@ -190,6 +193,33 @@ export default function JobDetailsPage() {
                 </h2>
                 <div className="text-base-content/80 whitespace-pre-line leading-relaxed">
                   {job.description || 'No description available.'}
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Link
+                    href={`/student/prep/for-job/${job.id}`}
+                    className="btn btn-outline btn-sm gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Prep for this role
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      setContacting(true);
+                      try {
+                        const conv = await messagesApi.createConversation({ job_id: job.id });
+                        router.push(`/student/messages/${conv.id}`);
+                      } catch (err) {
+                        setError(handleApiError(err));
+                      } finally {
+                        setContacting(false);
+                      }
+                    }}
+                    disabled={contacting}
+                    className="btn btn-outline btn-sm gap-2"
+                  >
+                    {contacting ? <span className="loading loading-spinner loading-sm" /> : <Mail className="w-4 h-4" />}
+                    Contact company
+                  </button>
                 </div>
               </div>
             </div>

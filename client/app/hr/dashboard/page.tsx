@@ -6,7 +6,7 @@ import StatCard from '@/components/ui/StatCard';
 import { FileText, Users, Briefcase, TrendingUp, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { jobsApi } from '@/lib/api';
+import { jobsApi, hrApi } from '@/lib/api';
 import { Job } from '@/types/api';
 import { handleApiError } from '@/lib/errors';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -19,14 +19,24 @@ interface Application {
   matchScore: number;
 }
 
+interface HRStats {
+  total_jobs: number;
+  total_applications: number;
+  shortlisted: number;
+  avg_ats_score: number;
+}
+
 export default function HRDashboard() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [stats, setStats] = useState<HRStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchJobs();
+    fetchStats();
   }, []);
 
   const fetchJobs = async () => {
@@ -42,30 +52,20 @@ export default function HRDashboard() {
     }
   };
 
-  // Mock applications - will be replaced when applications API is available
-  const recentApplications: Application[] = [
-    {
-      id: 1,
-      candidateName: 'John Doe',
-      jobTitle: 'Frontend Developer',
-      appliedDate: '2024-01-15',
-      matchScore: 95,
-    },
-    {
-      id: 2,
-      candidateName: 'Jane Smith',
-      jobTitle: 'Software Engineer',
-      appliedDate: '2024-01-14',
-      matchScore: 88,
-    },
-    {
-      id: 3,
-      candidateName: 'Mike Johnson',
-      jobTitle: 'UI/UX Designer',
-      appliedDate: '2024-01-13',
-      matchScore: 92,
-    },
-  ];
+  const fetchStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      const data = await hrApi.getStats();
+      setStats(data);
+    } catch (err) {
+      setError(handleApiError(err));
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  // Placeholder for recent applications (could be wired to an API later)
+  const recentApplications: Application[] = [];
 
   return (
     <ProtectedRoute requiredRole="hr">
@@ -91,21 +91,21 @@ export default function HRDashboard() {
         />
         <StatCard
           title="Applications Received"
-          value={156}
+          value={isLoadingStats ? '—' : stats?.total_applications ?? 0}
           icon={FileText}
           color="secondary"
           delay={0.2}
         />
         <StatCard
           title="Candidates Shortlisted"
-          value={24}
+          value={isLoadingStats ? '—' : stats?.shortlisted ?? 0}
           icon={Users}
           color="accent"
           delay={0.3}
         />
         <StatCard
           title="Avg. Match Score"
-          value="87%"
+          value={isLoadingStats ? '—' : stats != null ? `${stats.avg_ats_score}%` : '0%'}
           icon={TrendingUp}
           color="success"
           delay={0.4}
@@ -153,33 +153,37 @@ export default function HRDashboard() {
             </Link>
           </div>
           <div className="space-y-4">
-            {recentApplications.map((application, index) => (
-              <motion.div
-                key={application.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-                className="flex items-center justify-between p-4 bg-base-200 rounded-xl hover:bg-base-300 transition-colors"
-              >
-                <div className="flex-1">
-                  <h3 className="font-semibold text-base-content">{application.candidateName}</h3>
-                  <p className="text-sm text-base-content/70">{application.jobTitle}</p>
-                  <p className="text-xs text-base-content/60 mt-1">
-                    Applied: {new Date(application.appliedDate).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-sm text-base-content/70">Match Score</p>
-                    <p className="text-lg font-bold text-primary">{application.matchScore}%</p>
+            {recentApplications.length === 0 ? (
+              <p className="text-base-content/70 py-4">No recent applications. View candidates to see applications.</p>
+            ) : (
+              recentApplications.map((application, index) => (
+                <motion.div
+                  key={application.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
+                  className="flex items-center justify-between p-4 bg-base-200 rounded-xl hover:bg-base-300 transition-colors"
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-base-content">{application.candidateName}</h3>
+                    <p className="text-sm text-base-content/70">{application.jobTitle}</p>
+                    <p className="text-xs text-base-content/60 mt-1">
+                      Applied: {new Date(application.appliedDate).toLocaleDateString()}
+                    </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button className="btn btn-primary btn-sm">View Profile</button>
-                    <button className="btn btn-ghost btn-sm">Shortlist</button>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-sm text-base-content/70">Match Score</p>
+                      <p className="text-lg font-bold text-primary">{application.matchScore}%</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Link href="/hr/candidates" className="btn btn-primary btn-sm">View Profile</Link>
+                      <button className="btn btn-ghost btn-sm">Shortlist</button>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </motion.div>

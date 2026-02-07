@@ -1,8 +1,12 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Eye, FileText, User, Mail, Phone, Calendar, MapPin, GraduationCap, Award, TrendingUp } from 'lucide-react';
+import { CheckCircle, Eye, FileText, User, Mail, Phone, GraduationCap, Award, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
+import BadgeList from './BadgeList';
+import { badgesApi } from '@/lib/api';
+import { CandidateBadge } from '@/types/api';
 
 interface ProfileFieldProps {
   label: string;
@@ -43,6 +47,7 @@ interface ProfileSectionProps {
 }
 
 export default function ProfileSection({ profileData, onEditProfile }: ProfileSectionProps) {
+  const [badges, setBadges] = useState<CandidateBadge[]>([]);
   const { 
     sid, 
     name, 
@@ -58,6 +63,10 @@ export default function ProfileSection({ profileData, onEditProfile }: ProfileSe
     isVerified,
     profileCompletion = 85
   } = profileData;
+
+  useEffect(() => {
+    badgesApi.getMyBadges().then(setBadges).catch(() => setBadges([]));
+  }, []);
 
   const handleViewResume = () => {
     if (resume) {
@@ -136,6 +145,12 @@ export default function ProfileSection({ profileData, onEditProfile }: ProfileSe
                 <span className="text-sm text-base-content/50">No resume uploaded</span>
               </div>
             )}
+          </div>
+
+          {/* Skill Badges */}
+          <div className="pt-2 border-t border-base-300">
+            <span className="text-sm text-base-content/70 block mb-2 font-medium">Skill Badges:</span>
+            <BadgeList badges={badges} emptyMessage="Earn badges by passing ATS evaluations." />
           </div>
 
           {/* Quick Stats */}

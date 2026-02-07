@@ -4,14 +4,16 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, User, Briefcase, MapPin, Star, Download, Mail, Phone, X, FileText, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { candidatesApi, resumeApi, jobsApi, atsApi } from '@/lib/api';
-import { Candidate, EvaluationResponse, Job } from '@/types/api';
+import { candidatesApi, resumeApi, jobsApi, atsApi, badgesApi, messagesApi } from '@/lib/api';
+import { Candidate, EvaluationResponse, Job, CandidateBadge } from '@/types/api';
+import BadgeList from '@/components/student/BadgeList';
 import { ApiException } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
 export default function CandidatesPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [prescreenedOnly, setPrescreenedOnly] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,12 +33,14 @@ export default function CandidatesPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [evaluationsError, setEvaluationsError] = useState<string | null>(null);
   const [createEvaluationError, setCreateEvaluationError] = useState<string | null>(null);
+  const [candidateBadges, setCandidateBadges] = useState<CandidateBadge[]>([]);
+  const [messageLoading, setMessageLoading] = useState(false);
 
   const fetchCandidates = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await candidatesApi.list();
+      const data = await candidatesApi.list(0, 100, prescreenedOnly ? true : undefined);
       setCandidates(data);
     } catch (err) {
       console.error('Error fetching candidates:', err);
@@ -53,7 +57,7 @@ export default function CandidatesPage() {
   useEffect(() => {
     fetchCandidates();
     fetchJobs();
-  }, []);
+  }, [prescreenedOnly]);
 
   const fetchJobs = async () => {
     try {
@@ -94,8 +98,12 @@ export default function CandidatesPage() {
       setIsLoadingProfile(true);
       setProfileError(null);
       setSelectedCandidate(candidate);
-      const profile = await candidatesApi.get(candidate.id);
+      const [profile, badges] = await Promise.all([
+        candidatesApi.get(candidate.id),
+        badgesApi.getCandidateBadges(candidate.id).catch(() => []),
+      ]);
       setSelectedCandidate(profile);
+      setCandidateBadges(badges);
       setShowProfileModal(true);
     } catch (err) {
       console.error('Error fetching profile:', err);
@@ -230,8 +238,8 @@ export default function CandidatesPage() {
         className="card bg-base-100 shadow-lg"
       >
         <div className="card-body">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex-1 min-w-[200px] relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/50" />
               <input
                 type="text"
@@ -241,6 +249,15 @@ export default function CandidatesPage() {
                 className="input input-bordered w-full pl-10"
               />
             </div>
+            <label className="label cursor-pointer gap-2 border border-base-300 rounded-lg px-4 py-2 bg-base-200/50">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary checkbox-sm"
+                checked={prescreenedOnly}
+                onChange={(e) => setPrescreenedOnly(e.target.checked)}
+              />
+              <span className="label-text">Pre-screened only</span>
+            </label>
             <button className="btn btn-outline">
               <Filter className="w-5 h-5 mr-2" />
               Filters
@@ -338,6 +355,9 @@ export default function CandidatesPage() {
                           {candidate.resume_id && (
                             <span className="badge badge-success badge-sm">Resume Available</span>
                           )}
+                          {candidate.is_verified && (
+                            <span className="badge badge-info badge-sm">TPO Verified</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -421,8 +441,13 @@ export default function CandidatesPage() {
                       <span className="text-2xl">{selectedCandidate.name.charAt(0)}</span>
                     </div>
                   </div>
-                  <div>
-                    <h4 className="text-xl font-bold">{selectedCandidate.name}</h4>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-xl font-bold">{selectedCandidate.name}</h4>
+                      {selectedCandidate.is_verified && (
+                        <span className="badge badge-info badge-sm">TPO Verified</span>
+                      )}
+                    </div>
                     <p className="text-base-content/70">{selectedCandidate.email}</p>
                   </div>
                 </div>
@@ -474,6 +499,15 @@ export default function CandidatesPage() {
                   )}
                 </div>
 
+                {candidateBadges.length > 0 && (
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-semibold">Skill Badges</span>
+                    </label>
+                    <BadgeList badges={candidateBadges} />
+                  </div>
+                )}
+
                 {selectedCandidate.skills_json && selectedCandidate.skills_json.length > 0 && (
                   <div>
                     <label className="label">
@@ -493,11 +527,33 @@ export default function CandidatesPage() {
 
             <div className="modal-action">
               <button
+                className="btn btn-primary gap-2"
+                disabled={messageLoading}
+                onClick={async () => {
+                  if (!selectedCandidate) return;
+                  setMessageLoading(true);
+                  try {
+                    const conv = await messagesApi.createConversation({ candidate_id: selectedCandidate.id });
+                    setShowProfileModal(false);
+                    setSelectedCandidate(null);
+                    router.push(`/hr/messages/${conv.id}`);
+                  } catch (err) {
+                    setProfileError(err instanceof ApiException ? err.message : 'Failed to start conversation');
+                  } finally {
+                    setMessageLoading(false);
+                  }
+                }}
+              >
+                {messageLoading ? <span className="loading loading-spinner loading-sm" /> : <Mail className="w-4 h-4" />}
+                Message
+              </button>
+              <button
                 className="btn"
                 onClick={() => {
                   setShowProfileModal(false);
                   setSelectedCandidate(null);
                   setProfileError(null);
+                  setCandidateBadges([]);
                 }}
               >
                 Close
@@ -508,6 +564,7 @@ export default function CandidatesPage() {
             setShowProfileModal(false);
             setSelectedCandidate(null);
             setProfileError(null);
+            setCandidateBadges([]);
           }}></div>
         </div>
       )}

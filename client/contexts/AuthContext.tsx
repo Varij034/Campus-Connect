@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, role: 'student' | 'hr') => Promise<void>;
+  register: (email: string, password: string, role: 'student' | 'hr' | 'tpo') => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -63,10 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, role: 'student' | 'hr') => {
+  const register = async (email: string, password: string, role: 'student' | 'hr' | 'tpo') => {
     try {
-      // Map 'hr' to 'recruiter' for backend
-      const backendRole = role === 'hr' ? 'recruiter' : 'student';
+      // Map client roles to backend roles
+      const backendRole = role === 'hr' ? 'recruiter' : role === 'tpo' ? 'tpo' : 'student';
       const newUser = await authApi.register(email, password, backendRole);
       
       // Auto-login after registration

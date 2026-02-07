@@ -18,7 +18,7 @@ from database.postgres import engine, Base
 # MongoDB client will be imported where needed to handle None case
 
 # Import routers
-from routers import auth, resume, ats, feedback, student, jobs, candidates, chat, vector, recruiter_llm, job_llm, analytics_llm
+from routers import auth, resume, ats, feedback, student, jobs, candidates, chat, vector, recruiter_llm, job_llm, analytics_llm, tpo, hr, badges, prep, aptitude, notifications, mentorship, events, messages
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -51,6 +51,15 @@ app.include_router(vector.router)
 app.include_router(recruiter_llm.router)
 app.include_router(job_llm.router)
 app.include_router(analytics_llm.router)
+app.include_router(tpo.router)
+app.include_router(hr.router)
+app.include_router(badges.router)
+app.include_router(prep.router)
+app.include_router(aptitude.router)
+app.include_router(notifications.router)
+app.include_router(mentorship.router)
+app.include_router(events.router)
+app.include_router(messages.router)
 
 
 @app.on_event("startup")

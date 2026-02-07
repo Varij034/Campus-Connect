@@ -7,7 +7,7 @@ import { UserRole } from '@/types/api';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'student' | 'hr' | 'admin';
+  requiredRole?: 'student' | 'hr' | 'admin' | 'tpo';
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
@@ -27,6 +27,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
           'student': UserRole.STUDENT,
           'hr': UserRole.RECRUITER,
           'admin': UserRole.ADMIN,
+          'tpo': UserRole.TPO,
         };
 
         const requiredBackendRole = roleMap[requiredRole];
@@ -36,6 +37,8 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
             router.push('/student/dashboard');
           } else if (user.role === UserRole.RECRUITER) {
             router.push('/hr/dashboard');
+          } else if (user.role === UserRole.TPO) {
+            router.push('/tpo/dashboard');
           } else {
             router.push('/auth/login');
           }
@@ -61,6 +64,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
       'student': UserRole.STUDENT,
       'hr': UserRole.RECRUITER,
       'admin': UserRole.ADMIN,
+      'tpo': UserRole.TPO,
     };
 
     const requiredBackendRole = roleMap[requiredRole];

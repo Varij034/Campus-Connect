@@ -14,13 +14,19 @@ import {
   LayoutDashboard,
   Briefcase,
   FileEdit,
+  FileText,
   Users,
-  ClipboardList
+  ClipboardList,
+  Sparkles,
+  Brain,
+  UserPlus,
+  Calendar,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileNavProps {
-  role: 'student' | 'hr';
+  role: 'student' | 'hr' | 'tpo';
 }
 
 export default function MobileNav({ role }: MobileNavProps) {
@@ -38,7 +44,12 @@ export default function MobileNav({ role }: MobileNavProps) {
   const studentLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/jobs', label: 'Jobs', icon: Briefcase },
+    { href: '/prep', label: 'Prep', icon: FileText },
+    { href: '/aptitude', label: 'Aptitude', icon: Brain },
+    { href: '/mentors', label: 'Mentors', icon: UserPlus },
+    { href: '/events', label: 'Events', icon: Calendar },
     { href: '/applications', label: 'Applications', icon: ClipboardList },
+    { href: '/messages', label: 'Messages', icon: Mail },
     { href: '/chat', label: 'AI Chat', icon: MessageSquare },
     { href: '/profile', label: 'Profile', icon: User },
   ];
@@ -47,11 +58,20 @@ export default function MobileNav({ role }: MobileNavProps) {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/postings', label: 'Postings', icon: FileEdit },
     { href: '/candidates', label: 'Candidates', icon: Users },
+    { href: '/jd-matchmaker', label: 'JD Matchmaker', icon: Sparkles },
+    { href: '/messages', label: 'Messages', icon: Mail },
     { href: '/chat', label: 'AI Chat', icon: MessageSquare },
     { href: '/profile', label: 'Profile', icon: User },
   ];
 
-  const links = role === 'student' ? studentLinks : hrLinks;
+  const tpoLinks = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/chat', label: 'AI Chat', icon: MessageSquare },
+    { href: '/profile', label: 'Profile', icon: User },
+  ];
+
+  const links = role === 'student' ? studentLinks : role === 'tpo' ? tpoLinks : hrLinks;
+  const prefix = role === 'student' ? 'student' : role === 'tpo' ? 'tpo' : 'hr';
 
   return (
     <div className="md:hidden">
@@ -75,11 +95,11 @@ export default function MobileNav({ role }: MobileNavProps) {
             <ul className="space-y-2">
               {links.map((link) => {
                 const Icon = link.icon;
-                const isActive = pathname === `/${role === 'student' ? 'student' : 'hr'}${link.href}`;
+                const isActive = pathname === `/${prefix}${link.href}`;
                 return (
                   <li key={link.href}>
                     <Link
-                      href={`/${role === 'student' ? 'student' : 'hr'}${link.href}`}
+                      href={`/${prefix}${link.href}`}
                       onClick={() => setIsOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                         isActive

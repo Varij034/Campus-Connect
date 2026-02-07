@@ -4,6 +4,8 @@ export enum UserRole {
   STUDENT = "student",
   RECRUITER = "recruiter",
   ADMIN = "admin",
+  TPO = "tpo",
+  MENTOR = "mentor",
 }
 
 export interface User {
@@ -83,8 +85,106 @@ export interface Candidate {
   phone?: string;
   skills_json?: string[];
   resume_id?: string;
+  is_verified?: boolean;
+  verified_at?: string | null;
+  verified_by?: number | null;
   created_at: string;
   updated_at?: string;
+}
+
+export interface Badge {
+  id: number;
+  name: string;
+  description: string | null;
+  skill_key: string | null;
+  criteria_json: Record<string, unknown> | null;
+  image_url: string | null;
+}
+
+export interface CandidateBadge {
+  id: number;
+  candidate_id: number;
+  badge_id: number;
+  awarded_at: string;
+  source: string | null;
+  badge?: Badge;
+}
+
+export interface MentorProfile {
+  id: number;
+  user_id: number;
+  headline: string | null;
+  bio: string | null;
+  skills_json: string[] | null;
+  company: string | null;
+  years_experience: number | null;
+  linkedin_url: string | null;
+  is_available: boolean;
+  created_at: string;
+}
+
+export interface MentorshipRequest {
+  id: number;
+  mentor_id: number;
+  student_id: number;
+  message: string | null;
+  status: string;
+  created_at: string;
+  responded_at: string | null;
+}
+
+export interface Event {
+  id: number;
+  title: string;
+  description: string | null;
+  type: string;
+  start_date: string;
+  end_date: string;
+  location: string | null;
+  registration_deadline: string | null;
+  max_participants: number | null;
+  is_active: boolean;
+  created_by: number | null;
+  created_at: string;
+  registration_count?: number;
+}
+
+export interface EventRegistration {
+  id: number;
+  event_id: number;
+  candidate_id: number;
+  status: string;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: number;
+  job_id: number | null;
+  company_user_id: number;
+  candidate_id: number;
+  created_at: string;
+  job_title?: string | null;
+  candidate_name?: string | null;
+  last_message_preview?: string | null;
+}
+
+export interface Message {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  body: string;
+  created_at: string;
+}
+
+export interface PrepModule {
+  id: number;
+  title: string;
+  company: string | null;
+  job_id: number | null;
+  job_title_pattern: string | null;
+  content: string;
+  type: string | null;
+  created_at: string | null;
 }
 
 export interface ApiError {

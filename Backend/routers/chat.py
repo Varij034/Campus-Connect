@@ -36,7 +36,7 @@ async def chat_message(
                 data=data,
                 conversation_id=request.conversation_id
             )
-        elif current_user.role.value in ["recruiter", "admin"]:
+        elif current_user.role.value in ["recruiter", "admin", "tpo"]:
             # Initialize HR chat orchestrator
             orchestrator = ChatOrchestrator(db)
             
@@ -51,7 +51,7 @@ async def chat_message(
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Chat feature is only available for students, recruiters, and admins"
+                detail="Chat feature is only available for students, recruiters, admins, and TPOs"
             )
     except HTTPException:
         raise
