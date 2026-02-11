@@ -53,6 +53,37 @@ class AttemptResultResponse(BaseModel):
     correct_count: int
 
 
+class QuestionResultDetail(BaseModel):
+    question_id: int
+    question_text: str
+    option_a: str
+    option_b: str
+    option_c: str
+    option_d: str
+    correct_option: str
+    selected_option: Optional[str]
+    is_correct: bool
+    difficulty_level: str
+
+    class Config:
+        from_attributes = True
+
+
+class DetailedTestResultsResponse(BaseModel):
+    attempt_id: int
+    test_id: int
+    test_title: Optional[str]
+    user_id: int
+    score: float
+    total_questions: int
+    correct_answers: int
+    incorrect_answers: int
+    skipped_questions: int
+    time_taken: int
+    submitted_at: str
+    questions: List[QuestionResultDetail]
+
+
 @router.get("/tests", response_model=List[TestListItem])
 async def list_tests(
     db: Session = Depends(get_db),
@@ -218,3 +249,90 @@ async def my_attempts(
             "passed": a.passed,
         })
     return out
+
+
+@router.get("/attempts/{attempt_id}/detailed-results", response_model=DetailedTestResultsResponse)
+async def get_detailed_results(
+    attempt_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get detailed results for an attempt including all questions and answers."""
+    candidate = _get_candidate(current_user, db)
+    attempt = db.query(TestAttempt).filter(
+        TestAttempt.id == attempt_id,
+        TestAttempt.candidate_id == candidate.id,
+    ).first()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    if not attempt.submitted_at:
+        raise HTTPException(status_code=400, detail="Attempt not yet submitted")
+    
+    test = db.query(AptitudeTest).filter(AptitudeTest.id == attempt.test_id).first()
+    questions = db.query(AptitudeQuestion).filter(AptitudeQuestion.test_id == attempt.test_id).all()
+    
+    user_answers = attempt.answers_json or {}
+    questions_detail = []
+    correct_count = 0
+    skipped_count = 0
+    
+    # Map for converting index to letter
+    index_to_letter = {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
+    
+    for q in questions:
+        user_answer_index = None
+        if str(q.id) in user_answers:
+            user_answer_index = int(user_answers[str(q.id)])
+        
+        is_correct = (user_answer_index == q.correct_index) if user_answer_index is not None else False
+        if is_correct:
+            correct_count += 1
+        if user_answer_index is None:
+            skipped_count += 1
+        
+        # Get options from the options_json array or use empty strings
+        options = q.options_json or ['', '', '', '']
+        option_a = options[0] if len(options) > 0 else ''
+        option_b = options[1] if len(options) > 1 else ''
+        option_c = options[2] if len(options) > 2 else ''
+        option_d = options[3] if len(options) > 3 else ''
+        
+        # Convert indices to letters
+        correct_option = index_to_letter.get(q.correct_index, '')
+        selected_option = index_to_letter.get(user_answer_index) if user_answer_index is not None else None
+        
+        questions_detail.append(QuestionResultDetail(
+            question_id=q.id,
+            question_text=q.question_text,
+            option_a=option_a,
+            option_b=option_b,
+            option_c=option_c,
+            option_d=option_d,
+            correct_option=correct_option,
+            selected_option=selected_option,
+            is_correct=is_correct,
+            difficulty_level=q.difficulty or 'medium',
+        ))
+    
+    # Calculate time taken
+    time_taken = 0
+    if attempt.started_at and attempt.submitted_at:
+        time_delta = attempt.submitted_at - attempt.started_at
+        time_taken = int(time_delta.total_seconds())
+    
+    incorrect_count = len(questions) - correct_count - skipped_count
+    
+    return DetailedTestResultsResponse(
+        attempt_id=attempt.id,
+        test_id=attempt.test_id,
+        test_title=test.title if test else None,
+        user_id=current_user.id,
+        score=round(attempt.score, 2) if attempt.score else 0,
+        total_questions=len(questions),
+        correct_answers=correct_count,
+        incorrect_answers=incorrect_count,
+        skipped_questions=skipped_count,
+        time_taken=time_taken,
+        submitted_at=attempt.submitted_at.isoformat() if attempt.submitted_at else '',
+        questions=questions_detail,
+    )

@@ -118,7 +118,7 @@ export default function DetailedResultsPage() {
               text: q[key],
             }));
             return (
-              <div key={q.question_id} className="card bg-base-100 shadow">
+              <div key={`question-${q.question_id}`} className="card bg-base-100 shadow">
                 <div className="card-body">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-medium">

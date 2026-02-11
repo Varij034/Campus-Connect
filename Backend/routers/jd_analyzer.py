@@ -3,6 +3,7 @@
 import os
 import sys
 import tempfile
+import importlib.util
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -16,12 +17,26 @@ from database.mongodb import get_mongo_db
 # Allow importing from Backend/JD-Resume-Analyzer when running from Backend
 _backend_dir = Path(__file__).resolve().parent.parent
 _jd_analyzer_dir = _backend_dir / "JD-Resume-Analyzer"
-if _jd_analyzer_dir.exists() and str(_jd_analyzer_dir) not in sys.path:
-    sys.path.insert(0, str(_jd_analyzer_dir))
 
-from resume_parser import extract_text_from_resume
-from skill_analyzer import analyze_missing_skills
-from job_descriptions import get_job_description
+# Import modules from JD-Resume-Analyzer explicitly
+_resume_parser_path = _jd_analyzer_dir / "resume_parser.py"
+_skill_analyzer_path = _jd_analyzer_dir / "skill_analyzer.py"
+_job_descriptions_path = _jd_analyzer_dir / "job_descriptions.py"
+
+spec = importlib.util.spec_from_file_location("jd_resume_parser", _resume_parser_path)
+resume_parser_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(resume_parser_module)
+extract_text_from_resume = resume_parser_module.extract_text_from_resume
+
+spec = importlib.util.spec_from_file_location("jd_skill_analyzer", _skill_analyzer_path)
+skill_analyzer_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(skill_analyzer_module)
+analyze_missing_skills = skill_analyzer_module.analyze_missing_skills
+
+spec = importlib.util.spec_from_file_location("jd_job_descriptions", _job_descriptions_path)
+job_descriptions_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(job_descriptions_module)
+get_job_description = job_descriptions_module.get_job_description
 
 router = APIRouter(prefix="/api/v1/jd-analyzer", tags=["JD Analyzer"])
 
